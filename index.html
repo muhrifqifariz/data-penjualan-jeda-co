@@ -37,6 +37,16 @@
     border-bottom-right-radius:22px;
     box-shadow:0 4px 14px rgba(0,0,0,0.12);
   }
+  header .brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  header .brand img{
+    height:44px;
+    width:auto;
+    flex-shrink:0;
+  }
   header .eyebrow{
     font-size:12px; letter-spacing:.14em; text-transform:uppercase;
     opacity:.75; margin:0 0 4px;
@@ -104,6 +114,32 @@
   }
   .receipt-line .val{ font-variant-numeric:tabular-nums; font-family:Consolas, monospace; }
 
+  .komisi-card{
+    margin-top:16px; background:#fff; border-radius:16px; padding:16px 18px 14px;
+    border:1px solid var(--line);
+  }
+  .komisi-card h2{
+    font-family:Georgia, serif; font-size:14px; letter-spacing:.06em;
+    margin:0 0 12px; color:var(--emerald-dark);
+  }
+  .komisi-group{ font-size:12px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--ink-soft); font-weight:700; margin:12px 0 4px; }
+  .komisi-group:first-of-type{ margin-top:0; }
+  .komisi-row{
+    display:flex; justify-content:space-between; font-size:13.5px;
+    padding:4px 0; color:var(--ink);
+  }
+  .komisi-row .rp{ font-variant-numeric:tabular-nums; font-family:Consolas, monospace; color:var(--ink-soft); }
+  .komisi-estimate{
+    margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .komisi-estimate .label{ font-size:13px; color:var(--ink-soft); }
+  .komisi-estimate .val{
+    font-size:19px; font-weight:700; color:var(--gold);
+    font-variant-numeric:tabular-nums;
+  }
+
   button.primary{
     width:100%; margin:18px 0 8px; padding:15px; background:var(--emerald);
     color:#fff; border:none; border-radius:12px; font-size:16px; font-weight:600; cursor:pointer;
@@ -138,8 +174,13 @@
 <body>
 
 <header>
-  <p class="eyebrow">Buku Kas Digital</p>
-  <h1>Catatan Penjualan</h1>
+  <div class="brand">
+    <img src="logo-header.png" alt="Logo">
+    <div>
+      <p class="eyebrow">Buku Kas Digital</p>
+      <h1>Catatan Penjualan</h1>
+    </div>
+  </div>
   <div class="tabs">
     <button class="tab-btn active" data-screen="entryScreen">Input Data</button>
     <button class="tab-btn" data-screen="menuScreen">Kelola Menu</button>
@@ -152,8 +193,9 @@
   <section class="screen active" id="entryScreen">
     <div class="card">
       <label for="riderInput">Nama Rider</label>
-      <input type="text" id="riderInput" list="riderList" placeholder="Contoh: Pak Jay" autocomplete="off">
-      <datalist id="riderList"></datalist>
+      <select id="riderInput">
+        <option value="">— Pilih Rider —</option>
+      </select>
 
       <label for="tanggalInput">Tanggal</label>
       <input type="date" id="tanggalInput">
@@ -167,6 +209,10 @@
       <h2>Ringkasan</h2>
       <div class="receipt-line"><span>Total Cup Terjual</span><span class="val" id="totalCup">0</span></div>
       <div class="receipt-line total"><span>Total Penjualan</span><span class="val" id="totalRp">Rp0</span></div>
+    </div>
+
+    <div class="komisi-card" id="komisiCard">
+      <!-- diisi otomatis lewat JS dari sheet Aturan -->
     </div>
 
     <button class="primary" id="submitBtn">Kirim Semua Data</button>
@@ -211,6 +257,7 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbys_3TssKzKvycmsQqI8
 
 const $ = (id) => document.getElementById(id);
 let menuData = [];
+let aturanData = {};
 
 // ---------- Tab switching ----------
 document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -225,28 +272,37 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 
 // ---------- Init nama rider & tanggal ----------
 $("tanggalInput").value = new Date().toISOString().slice(0,10);
-$("riderInput").value = localStorage.getItem("nama_rider") || "";
 $("riderInput").addEventListener("change", () => {
-  localStorage.setItem("nama_rider", $("riderInput").value.trim());
+  localStorage.setItem("nama_rider", $("riderInput").value);
 });
 
 function formatRupiah(n){ return "Rp" + Math.round(n || 0).toLocaleString("id-ID"); }
 
-// ---------- Load menu & rider dari server ----------
+// ---------- Load menu, rider, & aturan dari server ----------
 async function loadMenu(){
   try{
     const res = await fetch(SCRIPT_URL);
     const data = await res.json();
     menuData = data.menu || [];
-    const riderList = $("riderList");
-    riderList.innerHTML = (data.riders || []).map(r => `<option value="${r}">`).join("");
+    aturanData = data.aturan || {};
+
+    const savedRider = localStorage.getItem("nama_rider") || "";
+    const select = $("riderInput");
+    select.innerHTML = '<option value="">— Pilih Rider —</option>' +
+      (data.riders || []).map(r => `<option value="${r}">${r}</option>`).join("");
+    if(savedRider) select.value = savedRider;
+
+    localStorage.setItem("menu_cache", JSON.stringify(menuData));
+    localStorage.setItem("aturan_cache", JSON.stringify(aturanData));
   }catch(e){
     // fallback: pakai cache lokal kalau offline
-    const cached = localStorage.getItem("menu_cache");
-    if(cached) menuData = JSON.parse(cached);
+    const cachedMenu = localStorage.getItem("menu_cache");
+    const cachedAturan = localStorage.getItem("aturan_cache");
+    if(cachedMenu) menuData = JSON.parse(cachedMenu);
+    if(cachedAturan) aturanData = JSON.parse(cachedAturan);
   }
-  if(menuData.length){ localStorage.setItem("menu_cache", JSON.stringify(menuData)); }
   renderEntryForm();
+  renderKomisiCard();
 }
 
 function renderEntryForm(){
@@ -303,14 +359,65 @@ function renderEntryForm(){
 
 function updateGrandTotal(){
   let cupTotal = 0, rpTotal = 0;
+  let cupMinuman = 0, cupCookies = 0;
   document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
     const t = parseFloat(item.querySelector(".terjual").value) || 0;
     const harga = parseFloat(item.dataset.harga) || 0;
     cupTotal += t;
     rpTotal += t * harga;
+    if(item.dataset.kategori === "Minuman") cupMinuman += t;
+    if(item.dataset.kategori === "Cookies") cupCookies += t;
   });
   $("totalCup").textContent = cupTotal;
   $("totalRp").textContent = formatRupiah(rpTotal);
+  renderKomisiCard(cupMinuman, cupCookies);
+}
+
+function hitungKomisi(cup, aturan){
+  if(!aturan) return { tier1: 0, tier2: 0, total: 0 };
+  const batas = aturan.batas || 0;
+  const tarif1 = aturan.tarif1 || 0;
+  const tarif2 = aturan.tarif2 || 0;
+  const cupTier1 = Math.min(cup, batas);
+  const cupTier2 = Math.max(cup - batas, 0);
+  const tier1 = cupTier1 * tarif1;
+  const tier2 = cupTier2 * tarif2;
+  return { tier1, tier2, total: tier1 + tier2 };
+}
+
+function renderKomisiCard(cupMinuman, cupCookies){
+  const card = $("komisiCard");
+  const minAturan = aturanData["Minuman"];
+  const cookAturan = aturanData["Cookies"];
+  if(!minAturan && !cookAturan){
+    card.innerHTML = "";
+    return;
+  }
+  cupMinuman = cupMinuman || 0;
+  cupCookies = cupCookies || 0;
+  const komisiMin = hitungKomisi(cupMinuman, minAturan);
+  const komisiCook = hitungKomisi(cupCookies, cookAturan);
+  const totalKomisi = komisiMin.total + komisiCook.total;
+
+  let html = `<h2>Aturan Komisi</h2>`;
+  if(minAturan){
+    html += `
+      <p class="komisi-group">Minuman</p>
+      <div class="komisi-row"><span>1-${minAturan.batas} cup</span><span class="rp">${formatRupiah(minAturan.tarif1)}/cup</span></div>
+      <div class="komisi-row"><span>${minAturan.batas+1}-200 cup</span><span class="rp">${formatRupiah(minAturan.tarif2)}/cup</span></div>`;
+  }
+  if(cookAturan){
+    html += `
+      <p class="komisi-group">Cookies</p>
+      <div class="komisi-row"><span>1-${cookAturan.batas} cup</span><span class="rp">${formatRupiah(cookAturan.tarif1)}/cup</span></div>
+      <div class="komisi-row"><span>${cookAturan.batas+1}-200 cup</span><span class="rp">${formatRupiah(cookAturan.tarif2)}/cup</span></div>`;
+  }
+  html += `
+    <div class="komisi-estimate">
+      <span class="label">Estimasi komisi hari ini</span>
+      <span class="val">${formatRupiah(totalKomisi)}</span>
+    </div>`;
+  card.innerHTML = html;
 }
 
 // ---------- Antrean offline ----------
