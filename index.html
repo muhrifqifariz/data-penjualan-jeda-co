@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Catatan Penjualan</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1F6F50">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --paper:#F6F3EC;
+    --paper-2:#EFEADF;
+    --ink:#22261F;
+    --ink-soft:#5B5F52;
+    --emerald:#1F6F50;
+    --emerald-dark:#154D37;
+    --gold:#B8860B;
+    --line:#D9D3C3;
+    --danger:#B4432E;
+    --blue-bg:#DCEFFB;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Segoe UI", Roboto, system-ui, sans-serif;
+    min-height:100vh;
+    padding:0 0 40px;
+  }
+  header{
+    background:var(--emerald);
+    color:var(--paper);
+    padding:22px 20px 16px;
+    border-bottom-left-radius:22px;
+    border-bottom-right-radius:22px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.12);
+  }
+  header .eyebrow{
+    font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    opacity:.75; margin:0 0 4px;
+  }
+  header h1{
+    margin:0; font-family:Georgia, serif; font-size:24px; font-weight:700;
+  }
+  .tabs{
+    display:flex; gap:8px; margin-top:16px;
+  }
+  .tab-btn{
+    flex:1; padding:10px; border:none; border-radius:10px;
+    background:rgba(255,255,255,0.15); color:var(--paper);
+    font-size:13.5px; font-weight:600; cursor:pointer;
+  }
+  .tab-btn.active{ background:var(--paper); color:var(--emerald-dark); }
+
+  main{ max-width:520px; margin:0 auto; padding:18px 16px 0; }
+  .screen{ display:none; }
+  .screen.active{ display:block; }
+
+  .card{
+    background:#fff; border-radius:16px; padding:16px 16px 6px;
+    box-shadow:0 2px 10px rgba(34,38,31,0.06); border:1px solid var(--line);
+    margin-bottom:16px;
+  }
+  label{ display:block; font-size:12.5px; color:var(--ink-soft); margin:12px 0 6px; }
+  input, select{
+    width:100%; padding:11px 12px; font-size:15.5px;
+    border:1.5px solid var(--line); border-radius:10px;
+    background:var(--paper); color:var(--ink); font-family:inherit;
+  }
+  input:focus, select:focus{ outline:none; border-color:var(--emerald); background:#fff; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .menu-group-title{
+    font-size:12px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--ink-soft); margin:18px 0 6px; font-weight:700;
+  }
+  .menu-item{
+    border-top:1px solid var(--line); padding:12px 0;
+  }
+  .menu-item:first-child{ border-top:none; }
+  .menu-item-name{ font-size:15px; font-weight:600; margin-bottom:2px; }
+  .menu-item-harga{ font-size:12.5px; color:var(--ink-soft); margin-bottom:8px; }
+  .menu-item .row2 input{ background:var(--blue-bg); border-color:#B9DCF2; }
+  .menu-item-calc{
+    display:flex; justify-content:space-between; font-size:12.5px;
+    color:var(--ink-soft); margin-top:8px;
+  }
+  .menu-item-calc .val{ font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink); }
+
+  .receipt{
+    margin-top:18px; background:var(--paper-2); border-radius:16px 16px 4px 4px;
+    padding:16px 18px 14px; border:1px dashed var(--line);
+  }
+  .receipt h2{
+    font-family:Georgia, serif; font-size:13px; letter-spacing:.1em;
+    text-transform:uppercase; margin:0 0 10px; color:var(--ink-soft);
+  }
+  .receipt-line{ display:flex; justify-content:space-between; font-size:14px; padding:5px 0; }
+  .receipt-line.total{
+    border-top:1px dashed var(--line); margin-top:6px; padding-top:10px;
+    font-size:18px; font-weight:700; color:var(--emerald-dark);
+  }
+  .receipt-line .val{ font-variant-numeric:tabular-nums; font-family:Consolas, monospace; }
+
+  button.primary{
+    width:100%; margin:18px 0 8px; padding:15px; background:var(--emerald);
+    color:#fff; border:none; border-radius:12px; font-size:16px; font-weight:600; cursor:pointer;
+  }
+  button.primary:disabled{ opacity:.6; }
+  button.secondary{
+    width:100%; padding:12px; background:transparent; color:var(--emerald-dark);
+    border:1.5px solid var(--emerald); border-radius:12px; font-size:14px; font-weight:600; cursor:pointer;
+    margin-bottom:14px;
+  }
+  .status{ text-align:center; font-size:13px; min-height:18px; margin-bottom:8px; color:var(--ink-soft); }
+  .status.ok{ color:var(--emerald-dark); font-weight:600; }
+  .status.err{ color:var(--danger); font-weight:600; }
+  .queue-note{ text-align:center; font-size:12px; color:var(--ink-soft); margin-bottom:16px; }
+  .queue-note b{ color:var(--gold); }
+
+  .menu-manage-item{
+    display:flex; align-items:center; gap:10px; border-top:1px solid var(--line);
+    padding:12px 0;
+  }
+  .menu-manage-item:first-child{ border-top:none; }
+  .menu-manage-info{ flex:1; }
+  .menu-manage-name{ font-size:14.5px; font-weight:600; }
+  .menu-manage-sub{ font-size:12px; color:var(--ink-soft); }
+  .icon-btn{
+    border:none; background:var(--paper-2); border-radius:8px; padding:8px 10px;
+    font-size:13px; cursor:pointer; color:var(--ink);
+  }
+  .icon-btn.del{ color:var(--danger); }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Buku Kas Digital</p>
+  <h1>Catatan Penjualan</h1>
+  <div class="tabs">
+    <button class="tab-btn active" data-screen="entryScreen">Input Data</button>
+    <button class="tab-btn" data-screen="menuScreen">Kelola Menu</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ===================== SCREEN: INPUT DATA ===================== -->
+  <section class="screen active" id="entryScreen">
+    <div class="card">
+      <label for="riderInput">Nama Rider</label>
+      <input type="text" id="riderInput" list="riderList" placeholder="Contoh: Pak Jay" autocomplete="off">
+      <datalist id="riderList"></datalist>
+
+      <label for="tanggalInput">Tanggal</label>
+      <input type="date" id="tanggalInput">
+    </div>
+
+    <div class="card" id="menuListCard">
+      <!-- diisi otomatis lewat JS dari daftar menu -->
+    </div>
+
+    <div class="receipt">
+      <h2>Ringkasan</h2>
+      <div class="receipt-line"><span>Total Cup Terjual</span><span class="val" id="totalCup">0</span></div>
+      <div class="receipt-line total"><span>Total Penjualan</span><span class="val" id="totalRp">Rp0</span></div>
+    </div>
+
+    <button class="primary" id="submitBtn">Kirim Semua Data</button>
+    <p class="status" id="statusMsg"></p>
+    <p class="queue-note" id="queueNote"></p>
+  </section>
+
+  <!-- ===================== SCREEN: KELOLA MENU ===================== -->
+  <section class="screen" id="menuScreen">
+    <div class="card" id="menuManageCard">
+      <!-- diisi otomatis lewat JS -->
+    </div>
+
+    <div class="card">
+      <p class="menu-group-title" style="margin-top:0">Tambah Menu Baru</p>
+      <label for="newMenuName">Nama Menu</label>
+      <input type="text" id="newMenuName" placeholder="Contoh: Coco Vanilla">
+      <div class="row2">
+        <div>
+          <label for="newMenuKategori">Kategori</label>
+          <select id="newMenuKategori">
+            <option value="Minuman">Minuman</option>
+            <option value="Cookies">Cookies</option>
+          </select>
+        </div>
+        <div>
+          <label for="newMenuHarga">Harga (Rp)</label>
+          <input type="number" id="newMenuHarga" placeholder="0">
+        </div>
+      </div>
+      <button class="primary" id="addMenuBtn" style="margin-bottom:16px;">Tambah Menu</button>
+    </div>
+    <p class="status" id="menuStatusMsg"></p>
+  </section>
+
+</main>
+
+<script>
+// ================== KONFIGURASI ==================
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbys_3TssKzKvycmsQqI8MHg12aqUnFUpuTl8ZACXAyUrK5mnWNsaC1bmbMd1Tt8GhTl/exec";
+// ==================================================
+
+const $ = (id) => document.getElementById(id);
+let menuData = [];
+
+// ---------- Tab switching ----------
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    btn.classList.add("active");
+    $(btn.dataset.screen).classList.add("active");
+    if(btn.dataset.screen === "menuScreen") renderMenuManage();
+  });
+});
+
+// ---------- Init nama rider & tanggal ----------
+$("tanggalInput").value = new Date().toISOString().slice(0,10);
+$("riderInput").value = localStorage.getItem("nama_rider") || "";
+$("riderInput").addEventListener("change", () => {
+  localStorage.setItem("nama_rider", $("riderInput").value.trim());
+});
+
+function formatRupiah(n){ return "Rp" + Math.round(n || 0).toLocaleString("id-ID"); }
+
+// ---------- Load menu & rider dari server ----------
+async function loadMenu(){
+  try{
+    const res = await fetch(SCRIPT_URL);
+    const data = await res.json();
+    menuData = data.menu || [];
+    const riderList = $("riderList");
+    riderList.innerHTML = (data.riders || []).map(r => `<option value="${r}">`).join("");
+  }catch(e){
+    // fallback: pakai cache lokal kalau offline
+    const cached = localStorage.getItem("menu_cache");
+    if(cached) menuData = JSON.parse(cached);
+  }
+  if(menuData.length){ localStorage.setItem("menu_cache", JSON.stringify(menuData)); }
+  renderEntryForm();
+}
+
+function renderEntryForm(){
+  const card = $("menuListCard");
+  const kategoriList = ["Minuman", "Cookies"];
+  let html = "";
+  kategoriList.forEach(kat => {
+    const items = menuData.filter(m => m.kategori === kat);
+    if(!items.length) return;
+    html += `<p class="menu-group-title">${kat}</p>`;
+    items.forEach((m, idx) => {
+      const id = `${kat}_${idx}`;
+      html += `
+        <div class="menu-item" data-menu="${m.menu}" data-kategori="${m.kategori}" data-harga="${m.harga}">
+          <div class="menu-item-name">${m.menu}</div>
+          <div class="menu-item-harga">${formatRupiah(m.harga)} / cup</div>
+          <div class="row2">
+            <div>
+              <label style="margin:0 0 4px;">Stock Awal</label>
+              <input type="number" class="stockAwal" inputmode="numeric" placeholder="0" min="0">
+            </div>
+            <div>
+              <label style="margin:0 0 4px;">Terjual</label>
+              <input type="number" class="terjual" inputmode="numeric" placeholder="0" min="0">
+            </div>
+          </div>
+          <div class="menu-item-calc">
+            <span>Sisa: <span class="val sisaVal">0</span></span>
+            <span>Total: <span class="val totalVal">Rp0</span></span>
+          </div>
+        </div>`;
+    });
+  });
+  card.innerHTML = html || "<p>Belum ada menu. Tambahkan lewat tab \"Kelola Menu\".</p>";
+
+  card.querySelectorAll(".menu-item").forEach(item => {
+    const stockInput = item.querySelector(".stockAwal");
+    const terjualInput = item.querySelector(".terjual");
+    const sisaVal = item.querySelector(".sisaVal");
+    const totalVal = item.querySelector(".totalVal");
+    const harga = parseFloat(item.dataset.harga) || 0;
+    function recalc(){
+      const s = parseFloat(stockInput.value) || 0;
+      const t = parseFloat(terjualInput.value) || 0;
+      sisaVal.textContent = Math.max(s - t, s - t);
+      totalVal.textContent = formatRupiah(t * harga);
+      updateGrandTotal();
+    }
+    stockInput.addEventListener("input", recalc);
+    terjualInput.addEventListener("input", recalc);
+  });
+  updateGrandTotal();
+}
+
+function updateGrandTotal(){
+  let cupTotal = 0, rpTotal = 0;
+  document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
+    const t = parseFloat(item.querySelector(".terjual").value) || 0;
+    const harga = parseFloat(item.dataset.harga) || 0;
+    cupTotal += t;
+    rpTotal += t * harga;
+  });
+  $("totalCup").textContent = cupTotal;
+  $("totalRp").textContent = formatRupiah(rpTotal);
+}
+
+// ---------- Antrean offline ----------
+const QUEUE_KEY = "penjualan_queue_v1";
+function getQueue(){ try{ return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; } catch(e){ return []; } }
+function saveQueue(q){ localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
+function refreshQueueNote(){
+  const q = getQueue();
+  $("queueNote").innerHTML = q.length
+    ? `<b>${q.length} kiriman</b> belum terkirim, akan dicoba ulang otomatis`
+    : "";
+}
+refreshQueueNote();
+
+async function sendToServer(payload){
+  const res = await fetch(SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: { "Content-Type": "text/plain;charset=utf-8" }
+  });
+  if(!res.ok) throw new Error("Gagal mengirim");
+  return res.json().catch(()=>({}));
+}
+
+async function flushQueue(){
+  let q = getQueue();
+  if(!q.length) return;
+  const remaining = [];
+  for(const item of q){
+    try{ await sendToServer(item); } catch(e){ remaining.push(item); }
+  }
+  saveQueue(remaining);
+  refreshQueueNote();
+}
+window.addEventListener("online", flushQueue);
+
+// ---------- Submit entry ----------
+$("submitBtn").addEventListener("click", async () => {
+  const rider = $("riderInput").value.trim();
+  if(!rider){
+    $("statusMsg").textContent = "Nama rider wajib diisi";
+    $("statusMsg").className = "status err";
+    return;
+  }
+  const items = [];
+  document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
+    const s = parseFloat(item.querySelector(".stockAwal").value) || 0;
+    const t = parseFloat(item.querySelector(".terjual").value) || 0;
+    if(s === 0 && t === 0) return; // lewati item yang tidak diisi
+    items.push({
+      menu: item.dataset.menu,
+      kategori: item.dataset.kategori,
+      harga: parseFloat(item.dataset.harga) || 0,
+      stockAwal: s,
+      terjual: t
+    });
+  });
+  if(!items.length){
+    $("statusMsg").textContent = "Isi minimal satu menu";
+    $("statusMsg").className = "status err";
+    return;
+  }
+
+  localStorage.setItem("nama_rider", rider);
+  const payload = { action: "entry", rider, tanggal: $("tanggalInput").value, items };
+
+  $("submitBtn").disabled = true;
+  $("statusMsg").textContent = "Mengirim...";
+  $("statusMsg").className = "status";
+
+  try{
+    await sendToServer(payload);
+    $("statusMsg").textContent = "Tersimpan ke Sheet ✓";
+    $("statusMsg").className = "status ok";
+    renderEntryForm();
+  }catch(err){
+    const q = getQueue();
+    q.push(payload);
+    saveQueue(q);
+    refreshQueueNote();
+    $("statusMsg").textContent = "Tidak ada koneksi — data disimpan sementara di HP";
+    $("statusMsg").className = "status err";
+    renderEntryForm();
+  }finally{
+    $("submitBtn").disabled = false;
+  }
+});
+
+// ---------- Kelola Menu ----------
+function renderMenuManage(){
+  const card = $("menuManageCard");
+  if(!menuData.length){ card.innerHTML = "<p>Belum ada menu.</p>"; return; }
+  card.innerHTML = menuData.map(m => `
+    <div class="menu-manage-item" data-menu="${m.menu}" data-kategori="${m.kategori}" data-harga="${m.harga}">
+      <div class="menu-manage-info">
+        <div class="menu-manage-name">${m.menu}</div>
+        <div class="menu-manage-sub">${m.kategori} · ${formatRupiah(m.harga)}</div>
+      </div>
+      <button class="icon-btn edit">Edit</button>
+      <button class="icon-btn del">Hapus</button>
+    </div>`).join("");
+
+  card.querySelectorAll(".menu-manage-item").forEach(row => {
+    row.querySelector(".edit").addEventListener("click", () => editMenu(row.dataset));
+    row.querySelector(".del").addEventListener("click", () => deleteMenu(row.dataset.menu));
+  });
+}
+
+async function editMenu(current){
+  const namaBaru = prompt("Nama menu:", current.menu);
+  if(namaBaru === null) return;
+  const kategoriBaru = prompt("Kategori (Minuman/Cookies):", current.kategori);
+  if(kategoriBaru === null) return;
+  const hargaBaru = prompt("Harga (Rp):", current.harga);
+  if(hargaBaru === null) return;
+
+  $("menuStatusMsg").textContent = "Menyimpan...";
+  $("menuStatusMsg").className = "status";
+  try{
+    await sendToServer({
+      action: "updateMenu",
+      oldMenu: current.menu,
+      menu: namaBaru.trim(),
+      kategori: kategoriBaru.trim(),
+      harga: parseFloat(hargaBaru) || 0
+    });
+    $("menuStatusMsg").textContent = "Menu diperbarui ✓";
+    $("menuStatusMsg").className = "status ok";
+    await loadMenu();
+    renderMenuManage();
+  }catch(e){
+    $("menuStatusMsg").textContent = "Gagal menyimpan — cek koneksi internet";
+    $("menuStatusMsg").className = "status err";
+  }
+}
+
+async function deleteMenu(nama){
+  if(!confirm(`Hapus menu "${nama}"?`)) return;
+  $("menuStatusMsg").textContent = "Menghapus...";
+  $("menuStatusMsg").className = "status";
+  try{
+    await sendToServer({ action: "deleteMenu", menu: nama });
+    $("menuStatusMsg").textContent = "Menu dihapus ✓";
+    $("menuStatusMsg").className = "status ok";
+    await loadMenu();
+    renderMenuManage();
+  }catch(e){
+    $("menuStatusMsg").textContent = "Gagal menghapus — cek koneksi internet";
+    $("menuStatusMsg").className = "status err";
+  }
+}
+
+$("addMenuBtn").addEventListener("click", async () => {
+  const nama = $("newMenuName").value.trim();
+  const kategori = $("newMenuKategori").value;
+  const harga = parseFloat($("newMenuHarga").value) || 0;
+  if(!nama){
+    $("menuStatusMsg").textContent = "Nama menu wajib diisi";
+    $("menuStatusMsg").className = "status err";
+    return;
+  }
+  $("menuStatusMsg").textContent = "Menyimpan...";
+  $("menuStatusMsg").className = "status";
+  try{
+    await sendToServer({ action: "addMenu", menu: nama, kategori, harga });
+    $("newMenuName").value = ""; $("newMenuHarga").value = "";
+    $("menuStatusMsg").textContent = "Menu ditambahkan ✓";
+    $("menuStatusMsg").className = "status ok";
+    await loadMenu();
+    renderMenuManage();
+  }catch(e){
+    $("menuStatusMsg").textContent = "Gagal menyimpan — cek koneksi internet";
+    $("menuStatusMsg").className = "status err";
+  }
+});
+
+// ---------- Start ----------
+loadMenu();
+if(navigator.onLine) flushQueue();
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
