@@ -207,8 +207,15 @@
 
     <div class="receipt">
       <h2>Ringkasan</h2>
-      <div class="receipt-line"><span>Total Cup Terjual</span><span class="val" id="totalCup">0</span></div>
-      <div class="receipt-line total"><span>Total Penjualan</span><span class="val" id="totalRp">Rp0</span></div>
+      <div class="receipt-line">
+        <span>Total Minuman</span>
+        <span class="val"><span id="totalCupMinuman">0</span> cup · <span id="totalRpMinuman">Rp0</span></span>
+      </div>
+      <div class="receipt-line">
+        <span>Total Cookies</span>
+        <span class="val"><span id="totalPcsCookies">0</span> pcs · <span id="totalRpCookies">Rp0</span></span>
+      </div>
+      <div class="receipt-line total"><span>Grand Total</span><span class="val" id="totalRp">Rp0</span></div>
     </div>
 
     <div class="komisi-card" id="komisiCard">
@@ -232,10 +239,12 @@
       <input type="text" id="newMenuName" placeholder="Contoh: Coco Vanilla">
       <div class="row2">
         <div>
-          <label for="newMenuKategori">Kategori</label>
-          <select id="newMenuKategori">
-            <option value="Minuman">Minuman</option>
-            <option value="Cookies">Cookies</option>
+          <label for="newMenuSub">Sub Kategori</label>
+          <select id="newMenuSub">
+            <option value="Cup">Minuman - Cup</option>
+            <option value="500 ml">Minuman - 500 ml (botol)</option>
+            <option value="1 Liter">Minuman - 1 Liter (botol)</option>
+            <option value="Cookies">Cookies (pcs)</option>
           </select>
         </div>
         <div>
@@ -305,32 +314,43 @@ async function loadMenu(){
   renderKomisiCard();
 }
 
+const SUBKATEGORI_ORDER = ["Cup", "500 ml", "1 Liter", "Cookies"];
+const SUBKATEGORI_LABEL = {
+  "Cup": "Minuman - Cup",
+  "500 ml": "Minuman - 500 ml (botol)",
+  "1 Liter": "Minuman - 1 Liter (botol)",
+  "Cookies": "Cookies (pcs)"
+};
+
 function renderEntryForm(){
   const card = $("menuListCard");
-  const kategoriList = ["Minuman", "Cookies"];
   let html = "";
-  kategoriList.forEach(kat => {
-    const items = menuData.filter(m => m.kategori === kat);
+  SUBKATEGORI_ORDER.forEach(sub => {
+    const items = sub === "Cookies"
+      ? menuData.filter(m => m.kategori === "Cookies")
+      : menuData.filter(m => m.kategori === "Minuman" && m.subKategori === sub);
     if(!items.length) return;
-    html += `<p class="menu-group-title">${kat}</p>`;
-    items.forEach((m, idx) => {
-      const id = `${kat}_${idx}`;
+    html += `<p class="menu-group-title">${SUBKATEGORI_LABEL[sub]}</p>`;
+    items.forEach((m) => {
+      const satuan = m.satuan || (m.kategori === "Cookies" ? "pcs" : "cup");
       html += `
-        <div class="menu-item" data-menu="${m.menu}" data-kategori="${m.kategori}" data-harga="${m.harga}">
+        <div class="menu-item" data-menu="${m.menu}" data-kategori="${m.kategori}"
+             data-sub="${m.subKategori || ''}" data-satuan="${satuan}"
+             data-konversi="${m.konversi || 1}" data-harga="${m.harga}">
           <div class="menu-item-name">${m.menu}</div>
-          <div class="menu-item-harga">${formatRupiah(m.harga)} / cup</div>
+          <div class="menu-item-harga">${formatRupiah(m.harga)} / ${satuan}</div>
           <div class="row2">
             <div>
-              <label style="margin:0 0 4px;">Stock Awal</label>
+              <label style="margin:0 0 4px;">Stock Awal (${satuan})</label>
               <input type="number" class="stockAwal" inputmode="numeric" placeholder="0" min="0">
             </div>
             <div>
-              <label style="margin:0 0 4px;">Terjual</label>
+              <label style="margin:0 0 4px;">Terjual (${satuan})</label>
               <input type="number" class="terjual" inputmode="numeric" placeholder="0" min="0">
             </div>
           </div>
           <div class="menu-item-calc">
-            <span>Sisa: <span class="val sisaVal">0</span></span>
+            <span>Sisa: <span class="val sisaVal">0</span> ${satuan}</span>
             <span>Total: <span class="val totalVal">Rp0</span></span>
           </div>
         </div>`;
@@ -347,7 +367,7 @@ function renderEntryForm(){
     function recalc(){
       const s = parseFloat(stockInput.value) || 0;
       const t = parseFloat(terjualInput.value) || 0;
-      sisaVal.textContent = Math.max(s - t, s - t);
+      sisaVal.textContent = s - t;
       totalVal.textContent = formatRupiah(t * harga);
       updateGrandTotal();
     }
@@ -358,19 +378,27 @@ function renderEntryForm(){
 }
 
 function updateGrandTotal(){
-  let cupTotal = 0, rpTotal = 0;
-  let cupMinuman = 0, cupCookies = 0;
+  let cupMinuman = 0, pcsCookies = 0;
+  let rpMinuman = 0, rpCookies = 0;
   document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
     const t = parseFloat(item.querySelector(".terjual").value) || 0;
     const harga = parseFloat(item.dataset.harga) || 0;
-    cupTotal += t;
-    rpTotal += t * harga;
-    if(item.dataset.kategori === "Minuman") cupMinuman += t;
-    if(item.dataset.kategori === "Cookies") cupCookies += t;
+    const konversi = parseFloat(item.dataset.konversi) || 1;
+    const rp = t * harga;
+    if(item.dataset.kategori === "Minuman"){
+      cupMinuman += t * konversi;
+      rpMinuman += rp;
+    } else {
+      pcsCookies += t;
+      rpCookies += rp;
+    }
   });
-  $("totalCup").textContent = cupTotal;
-  $("totalRp").textContent = formatRupiah(rpTotal);
-  renderKomisiCard(cupMinuman, cupCookies);
+  $("totalCupMinuman").textContent = cupMinuman;
+  $("totalRpMinuman").textContent = formatRupiah(rpMinuman);
+  $("totalPcsCookies").textContent = pcsCookies;
+  $("totalRpCookies").textContent = formatRupiah(rpCookies);
+  $("totalRp").textContent = formatRupiah(rpMinuman + rpCookies);
+  renderKomisiCard(cupMinuman, pcsCookies);
 }
 
 function hitungKomisi(cup, aturan){
@@ -409,8 +437,8 @@ function renderKomisiCard(cupMinuman, cupCookies){
   if(cookAturan){
     html += `
       <p class="komisi-group">Cookies</p>
-      <div class="komisi-row"><span>1-${cookAturan.batas} cup</span><span class="rp">${formatRupiah(cookAturan.tarif1)}/cup</span></div>
-      <div class="komisi-row"><span>${cookAturan.batas+1}-200 cup</span><span class="rp">${formatRupiah(cookAturan.tarif2)}/cup</span></div>`;
+      <div class="komisi-row"><span>1-${cookAturan.batas} pcs</span><span class="rp">${formatRupiah(cookAturan.tarif1)}/pcs</span></div>
+      <div class="komisi-row"><span>${cookAturan.batas+1}-200 pcs</span><span class="rp">${formatRupiah(cookAturan.tarif2)}/pcs</span></div>`;
   }
   html += `
     <div class="komisi-estimate">
@@ -470,6 +498,9 @@ $("submitBtn").addEventListener("click", async () => {
     items.push({
       menu: item.dataset.menu,
       kategori: item.dataset.kategori,
+      subKategori: item.dataset.sub,
+      satuan: item.dataset.satuan,
+      konversi: parseFloat(item.dataset.konversi) || 1,
       harga: parseFloat(item.dataset.harga) || 0,
       stockAwal: s,
       terjual: t
@@ -510,15 +541,19 @@ $("submitBtn").addEventListener("click", async () => {
 function renderMenuManage(){
   const card = $("menuManageCard");
   if(!menuData.length){ card.innerHTML = "<p>Belum ada menu.</p>"; return; }
-  card.innerHTML = menuData.map(m => `
-    <div class="menu-manage-item" data-menu="${m.menu}" data-kategori="${m.kategori}" data-harga="${m.harga}">
+  card.innerHTML = menuData.map(m => {
+    const subLabel = m.kategori === "Cookies" ? "Cookies (pcs)" : `Minuman - ${m.subKategori || "Cup"}`;
+    return `
+    <div class="menu-manage-item" data-menu="${m.menu}" data-kategori="${m.kategori}"
+         data-sub="${m.subKategori || ''}" data-harga="${m.harga}">
       <div class="menu-manage-info">
         <div class="menu-manage-name">${m.menu}</div>
-        <div class="menu-manage-sub">${m.kategori} · ${formatRupiah(m.harga)}</div>
+        <div class="menu-manage-sub">${subLabel} · ${formatRupiah(m.harga)}</div>
       </div>
       <button class="icon-btn edit">Edit</button>
       <button class="icon-btn del">Hapus</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   card.querySelectorAll(".menu-manage-item").forEach(row => {
     row.querySelector(".edit").addEventListener("click", () => editMenu(row.dataset));
@@ -526,11 +561,16 @@ function renderMenuManage(){
   });
 }
 
+function deriveKategori(sub){ return sub === "Cookies" ? "Cookies" : "Minuman"; }
+
 async function editMenu(current){
   const namaBaru = prompt("Nama menu:", current.menu);
   if(namaBaru === null) return;
-  const kategoriBaru = prompt("Kategori (Minuman/Cookies):", current.kategori);
-  if(kategoriBaru === null) return;
+  const subBaru = prompt(
+    "Sub kategori (ketik salah satu persis): Cup / 500 ml / 1 Liter / Cookies",
+    current.sub || (current.kategori === "Cookies" ? "Cookies" : "Cup")
+  );
+  if(subBaru === null) return;
   const hargaBaru = prompt("Harga (Rp):", current.harga);
   if(hargaBaru === null) return;
 
@@ -541,7 +581,8 @@ async function editMenu(current){
       action: "updateMenu",
       oldMenu: current.menu,
       menu: namaBaru.trim(),
-      kategori: kategoriBaru.trim(),
+      kategori: deriveKategori(subBaru.trim()),
+      subKategori: subBaru.trim() === "Cookies" ? "" : subBaru.trim(),
       harga: parseFloat(hargaBaru) || 0
     });
     $("menuStatusMsg").textContent = "Menu diperbarui ✓";
@@ -572,7 +613,8 @@ async function deleteMenu(nama){
 
 $("addMenuBtn").addEventListener("click", async () => {
   const nama = $("newMenuName").value.trim();
-  const kategori = $("newMenuKategori").value;
+  const sub = $("newMenuSub").value;
+  const kategori = deriveKategori(sub);
   const harga = parseFloat($("newMenuHarga").value) || 0;
   if(!nama){
     $("menuStatusMsg").textContent = "Nama menu wajib diisi";
@@ -582,7 +624,10 @@ $("addMenuBtn").addEventListener("click", async () => {
   $("menuStatusMsg").textContent = "Menyimpan...";
   $("menuStatusMsg").className = "status";
   try{
-    await sendToServer({ action: "addMenu", menu: nama, kategori, harga });
+    await sendToServer({
+      action: "addMenu", menu: nama, kategori,
+      subKategori: sub === "Cookies" ? "" : sub, harga
+    });
     $("newMenuName").value = ""; $("newMenuHarga").value = "";
     $("menuStatusMsg").textContent = "Menu ditambahkan ✓";
     $("menuStatusMsg").className = "status ok";
