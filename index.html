@@ -466,8 +466,10 @@ async function sendToServer(payload){
     body: JSON.stringify(payload),
     headers: { "Content-Type": "text/plain;charset=utf-8" }
   });
-  if(!res.ok) throw new Error("Gagal mengirim");
-  return res.json().catch(()=>({}));
+  if(!res.ok) throw new Error("Gagal mengirim (HTTP " + res.status + ")");
+  const data = await res.json().catch(() => { throw new Error("Respon server tidak valid"); });
+  if(data.status !== "ok") throw new Error(data.message || "Server menolak permintaan");
+  return data;
 }
 
 async function flushQueue(){
@@ -590,7 +592,7 @@ async function editMenu(current){
     await loadMenu();
     renderMenuManage();
   }catch(e){
-    $("menuStatusMsg").textContent = "Gagal menyimpan — cek koneksi internet";
+    $("menuStatusMsg").textContent = e.message || "Gagal menyimpan — cek koneksi internet";
     $("menuStatusMsg").className = "status err";
   }
 }
@@ -606,7 +608,7 @@ async function deleteMenu(nama){
     await loadMenu();
     renderMenuManage();
   }catch(e){
-    $("menuStatusMsg").textContent = "Gagal menghapus — cek koneksi internet";
+    $("menuStatusMsg").textContent = e.message || "Gagal menghapus — cek koneksi internet";
     $("menuStatusMsg").className = "status err";
   }
 }
@@ -621,6 +623,7 @@ $("addMenuBtn").addEventListener("click", async () => {
     $("menuStatusMsg").className = "status err";
     return;
   }
+  $("addMenuBtn").disabled = true;
   $("menuStatusMsg").textContent = "Menyimpan...";
   $("menuStatusMsg").className = "status";
   try{
@@ -634,8 +637,10 @@ $("addMenuBtn").addEventListener("click", async () => {
     await loadMenu();
     renderMenuManage();
   }catch(e){
-    $("menuStatusMsg").textContent = "Gagal menyimpan — cek koneksi internet";
+    $("menuStatusMsg").textContent = e.message || "Gagal menyimpan — cek koneksi internet";
     $("menuStatusMsg").className = "status err";
+  }finally{
+    $("addMenuBtn").disabled = false;
   }
 });
 
