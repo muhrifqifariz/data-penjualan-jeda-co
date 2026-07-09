@@ -1,7 +1,7 @@
 {
-  "name": "Catatan Penjualan",
-  "short_name": "Penjualan",
-  "description": "Aplikasi input data penjualan yang tersimpan ke Google Sheet",
+  "name": "Jeda Rider",
+  "short_name": "Jeda Rider",
+  "description": "Aplikasi input data penjualan Jeda.co yang tersimpan ke Google Sheet",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#F6F3EC",

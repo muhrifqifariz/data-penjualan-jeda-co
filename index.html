@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Catatan Penjualan</title>
+<title>Jeda Rider</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1F6F50">
 <link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-title" content="Jeda Rider">
 <style>
   :root{
     --paper:#F6F3EC;
@@ -140,6 +141,35 @@
     font-variant-numeric:tabular-nums;
   }
 
+  .setoran-card{
+    margin-top:16px; background:#fff; border-radius:16px; padding:16px 18px 6px;
+    border:1px solid var(--line);
+  }
+  .setoran-card h2{
+    font-family:Georgia, serif; font-size:14px; letter-spacing:.06em;
+    margin:0 0 4px; color:var(--emerald-dark);
+  }
+  .setoran-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:13.5px; padding:6px 0; color:var(--ink-soft);
+  }
+  .setoran-row.static{ border-bottom:1px dashed var(--line); }
+  .setoran-row input{
+    width:150px; text-align:right; background:var(--blue-bg); border-color:#B9DCF2;
+    padding:9px 10px; font-size:15px;
+  }
+  .setoran-row .rp{ font-variant-numeric:tabular-nums; font-family:Consolas, monospace; color:var(--ink); }
+  .setoran-result{
+    margin-top:6px; padding:12px 0 10px; border-top:1px dashed var(--line);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .setoran-result .label{ font-size:14px; font-weight:600; color:var(--emerald-dark); }
+  .setoran-result .val{
+    font-size:20px; font-weight:700; color:var(--emerald-dark);
+    font-variant-numeric:tabular-nums;
+  }
+  .setoran-result .val.negative{ color:var(--danger); }
+
   button.primary{
     width:100%; margin:18px 0 8px; padding:15px; background:var(--emerald);
     color:#fff; border:none; border-radius:12px; font-size:16px; font-weight:600; cursor:pointer;
@@ -222,6 +252,26 @@
       <!-- diisi otomatis lewat JS dari sheet Aturan -->
     </div>
 
+    <div class="setoran-card">
+      <h2>Setoran</h2>
+      <div class="setoran-row">
+        <span>Modal (Kembalian)</span>
+        <input type="number" id="modalInput" inputmode="numeric" placeholder="0" min="0">
+      </div>
+      <div class="setoran-row">
+        <span>QRIS</span>
+        <input type="number" id="qrisInput" inputmode="numeric" placeholder="0" min="0">
+      </div>
+      <div class="setoran-row static">
+        <span>Biaya Operasional</span>
+        <span class="rp" id="operasionalVal">Rp0</span>
+      </div>
+      <div class="setoran-result">
+        <span class="label">Setoran Cash</span>
+        <span class="val" id="setoranCashVal">Rp0</span>
+      </div>
+    </div>
+
     <button class="primary" id="submitBtn">Kirim Semua Data</button>
     <p class="status" id="statusMsg"></p>
     <p class="queue-note" id="queueNote"></p>
@@ -267,6 +317,9 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbys_3TssKzKvycmsQqI8
 const $ = (id) => document.getElementById(id);
 let menuData = [];
 let aturanData = {};
+let operasionalValue = 10000;
+let grandTotalRp = 0;
+let komisiTotalRp = 0;
 
 // ---------- Tab switching ----------
 document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -284,6 +337,8 @@ $("tanggalInput").value = new Date().toISOString().slice(0,10);
 $("riderInput").addEventListener("change", () => {
   localStorage.setItem("nama_rider", $("riderInput").value);
 });
+$("modalInput").addEventListener("input", updateSetoranCash);
+$("qrisInput").addEventListener("input", updateSetoranCash);
 
 function formatRupiah(n){ return "Rp" + Math.round(n || 0).toLocaleString("id-ID"); }
 
@@ -294,6 +349,8 @@ async function loadMenu(){
     const data = await res.json();
     menuData = data.menu || [];
     aturanData = data.aturan || {};
+    operasionalValue = data.operasional || 0;
+    $("operasionalVal").textContent = formatRupiah(operasionalValue);
 
     const savedRider = localStorage.getItem("nama_rider") || "";
     const select = $("riderInput");
@@ -303,12 +360,18 @@ async function loadMenu(){
 
     localStorage.setItem("menu_cache", JSON.stringify(menuData));
     localStorage.setItem("aturan_cache", JSON.stringify(aturanData));
+    localStorage.setItem("operasional_cache", JSON.stringify(operasionalValue));
   }catch(e){
     // fallback: pakai cache lokal kalau offline
     const cachedMenu = localStorage.getItem("menu_cache");
     const cachedAturan = localStorage.getItem("aturan_cache");
+    const cachedOperasional = localStorage.getItem("operasional_cache");
     if(cachedMenu) menuData = JSON.parse(cachedMenu);
     if(cachedAturan) aturanData = JSON.parse(cachedAturan);
+    if(cachedOperasional){
+      operasionalValue = JSON.parse(cachedOperasional);
+      $("operasionalVal").textContent = formatRupiah(operasionalValue);
+    }
   }
   renderEntryForm();
   renderKomisiCard();
@@ -397,7 +460,8 @@ function updateGrandTotal(){
   $("totalRpMinuman").textContent = formatRupiah(rpMinuman);
   $("totalPcsCookies").textContent = pcsCookies;
   $("totalRpCookies").textContent = formatRupiah(rpCookies);
-  $("totalRp").textContent = formatRupiah(rpMinuman + rpCookies);
+  grandTotalRp = rpMinuman + rpCookies;
+  $("totalRp").textContent = formatRupiah(grandTotalRp);
   renderKomisiCard(cupMinuman, pcsCookies);
 }
 
@@ -426,6 +490,7 @@ function renderKomisiCard(cupMinuman, cupCookies){
   const komisiMin = hitungKomisi(cupMinuman, minAturan);
   const komisiCook = hitungKomisi(cupCookies, cookAturan);
   const totalKomisi = komisiMin.total + komisiCook.total;
+  komisiTotalRp = totalKomisi;
 
   let html = `<h2>Aturan Komisi</h2>`;
   if(minAturan){
@@ -446,6 +511,17 @@ function renderKomisiCard(cupMinuman, cupCookies){
       <span class="val">${formatRupiah(totalKomisi)}</span>
     </div>`;
   card.innerHTML = html;
+  updateSetoranCash();
+}
+
+function updateSetoranCash(){
+  const modal = parseFloat($("modalInput").value) || 0;
+  const qris = parseFloat($("qrisInput").value) || 0;
+  $("operasionalVal").textContent = formatRupiah(operasionalValue);
+  const setoran = grandTotalRp + modal - qris - komisiTotalRp - operasionalValue;
+  const el = $("setoranCashVal");
+  el.textContent = formatRupiah(setoran);
+  el.classList.toggle("negative", setoran < 0);
 }
 
 // ---------- Antrean offline ----------
@@ -515,7 +591,14 @@ $("submitBtn").addEventListener("click", async () => {
   }
 
   localStorage.setItem("nama_rider", rider);
-  const payload = { action: "entry", rider, tanggal: $("tanggalInput").value, items };
+  const modal = parseFloat($("modalInput").value) || 0;
+  const qris = parseFloat($("qrisInput").value) || 0;
+  const setoranCash = grandTotalRp + modal - qris - komisiTotalRp - operasionalValue;
+  const payload = {
+    action: "entry", rider, tanggal: $("tanggalInput").value, items,
+    totalPenjualan: grandTotalRp, totalKomisi: komisiTotalRp,
+    modal, qris, operasional: operasionalValue, setoranCash
+  };
 
   $("submitBtn").disabled = true;
   $("statusMsg").textContent = "Mengirim...";
@@ -525,6 +608,8 @@ $("submitBtn").addEventListener("click", async () => {
     await sendToServer(payload);
     $("statusMsg").textContent = "Tersimpan ke Sheet ✓";
     $("statusMsg").className = "status ok";
+    $("modalInput").value = "";
+    $("qrisInput").value = "";
     renderEntryForm();
   }catch(err){
     const q = getQueue();
