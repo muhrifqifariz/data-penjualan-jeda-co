@@ -83,6 +83,10 @@
   input:focus, select:focus{ outline:none; border-color:var(--emerald); background:#fff; }
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
+  .form-section-title{
+    font-size:12px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--ink-soft); margin:18px 0 6px; font-weight:700;
+  }
   .menu-group-title{
     font-size:12px; text-transform:uppercase; letter-spacing:.08em;
     color:var(--ink-soft); margin:18px 0 6px; font-weight:700;
@@ -213,6 +217,50 @@
     font-size:13px; cursor:pointer; color:var(--ink);
   }
   .icon-btn.del{ color:var(--danger); }
+
+  .report-header{
+    text-align:center; margin-bottom:18px;
+  }
+  .report-header .check{
+    width:56px; height:56px; border-radius:50%; background:var(--emerald);
+    color:#fff; font-size:28px; display:flex; align-items:center; justify-content:center;
+    margin:0 auto 12px;
+  }
+  .report-header h1{
+    font-family:Georgia, serif; font-size:20px; margin:0 0 4px; color:var(--emerald-dark);
+  }
+  .report-header .sub{ font-size:13px; color:var(--ink-soft); }
+
+  .report-card{
+    background:#fff; border-radius:16px; padding:16px 18px; margin-bottom:14px;
+    border:1px solid var(--line);
+  }
+  .report-card h2{
+    font-family:Georgia, serif; font-size:14px; letter-spacing:.06em;
+    margin:0 0 10px; color:var(--emerald-dark);
+  }
+  .report-item{
+    display:flex; justify-content:space-between; align-items:baseline;
+    border-top:1px solid var(--line); padding:9px 0; font-size:13.5px;
+  }
+  .report-item:first-child{ border-top:none; }
+  .report-item .name{ font-weight:600; }
+  .report-item .qty{ color:var(--ink-soft); font-size:12.5px; }
+  .report-item .rp{
+    font-variant-numeric:tabular-nums; font-family:Consolas, monospace;
+    font-weight:600; white-space:nowrap; margin-left:10px;
+  }
+  .report-row{
+    display:flex; justify-content:space-between; padding:6px 0; font-size:13.5px;
+  }
+  .report-row .rp{ font-variant-numeric:tabular-nums; font-family:Consolas, monospace; }
+  .report-row.total{
+    border-top:1px dashed var(--line); margin-top:6px; padding-top:10px;
+    font-size:16px; font-weight:700; color:var(--emerald-dark);
+  }
+  .report-row.grand{
+    color:var(--gold); font-size:18px; font-weight:700;
+  }
 </style>
 </head>
 <body>
@@ -294,7 +342,7 @@
     </div>
 
     <div class="card">
-      <p class="menu-group-title" style="margin-top:0">Tambah Menu Baru</p>
+      <p class="form-section-title" style="margin-top:0">Tambah Menu Baru</p>
       <label for="newMenuName">Nama Menu</label>
       <input type="text" id="newMenuName" placeholder="Contoh: Coco Vanilla">
       <div class="row2">
@@ -317,6 +365,37 @@
     <p class="status" id="menuStatusMsg"></p>
   </section>
 
+  <!-- ===================== SCREEN: REPORT ===================== -->
+  <section class="screen" id="reportScreen">
+    <div class="report-header">
+      <div class="check">✓</div>
+      <h1>Data Tersimpan</h1>
+      <p class="sub" id="reportSubtitle"></p>
+    </div>
+
+    <div class="report-card">
+      <h2>Menu Terjual</h2>
+      <div id="reportMenuList"></div>
+    </div>
+
+    <div class="report-card">
+      <h2>Total Penjualan</h2>
+      <div class="report-row"><span>Total Minuman</span><span class="rp" id="reportRpMinuman">Rp0</span></div>
+      <div class="report-row"><span>Total Cookies</span><span class="rp" id="reportRpCookies">Rp0</span></div>
+      <div class="report-row total"><span>Grand Total</span><span class="rp" id="reportGrandTotal">Rp0</span></div>
+    </div>
+
+    <div class="report-card">
+      <h2>Setoran</h2>
+      <div class="report-row"><span>Modal (Kembalian)</span><span class="rp" id="reportModal">Rp0</span></div>
+      <div class="report-row"><span>QRIS</span><span class="rp" id="reportQris">Rp0</span></div>
+      <div class="report-row"><span>Total Komisi + Operasional</span><span class="rp" id="reportKomisiOps">Rp0</span></div>
+      <div class="report-row total grand"><span>Setoran Cash</span><span class="rp" id="reportSetoran">Rp0</span></div>
+    </div>
+
+    <button class="primary" id="backToEntryBtn">Input Data Baru</button>
+  </section>
+
 </main>
 
 <script>
@@ -329,15 +408,20 @@ let menuData = [];
 let aturanData = {};
 let operasionalValue = 10000;
 let grandTotalRp = 0;
+let rpMinumanTotal = 0;
+let rpCookiesTotal = 0;
 let komisiTotalRp = 0;
 
 // ---------- Tab switching ----------
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(id).classList.add("active");
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.screen === id));
+}
+
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-    btn.classList.add("active");
-    $(btn.dataset.screen).classList.add("active");
+    showScreen(btn.dataset.screen);
     if(btn.dataset.screen === "menuScreen") renderMenuManage();
   });
 });
@@ -502,6 +586,8 @@ function updateGrandTotal(){
   $("totalRpMinuman").textContent = formatRupiah(rpMinuman);
   $("totalPcsCookies").textContent = pcsCookies;
   $("totalRpCookies").textContent = formatRupiah(rpCookies);
+  rpMinumanTotal = rpMinuman;
+  rpCookiesTotal = rpCookies;
   grandTotalRp = rpMinuman + rpCookies;
   $("totalRp").textContent = formatRupiah(grandTotalRp);
   renderKomisiCard(cupMinuman, pcsCookies);
@@ -642,11 +728,17 @@ $("submitBtn").addEventListener("click", async () => {
   localStorage.setItem("nama_rider", rider);
   const modal = parseRupiahInput($("modalInput"));
   const qris = parseRupiahInput($("qrisInput"));
+  const komisiPlusOps = komisiTotalRp + operasionalValue;
   const setoranCash = grandTotalRp + modal - qris - komisiTotalRp - operasionalValue;
   const payload = {
     action: "entry", rider, tanggal: $("tanggalInput").value, items,
     totalPenjualan: grandTotalRp, totalKomisi: komisiTotalRp,
     modal, qris, operasional: operasionalValue, setoranCash
+  };
+  const reportSnapshot = {
+    rider, tanggal: $("tanggalInput").value, items,
+    rpMinuman: rpMinumanTotal, rpCookies: rpCookiesTotal, grandTotal: grandTotalRp,
+    modal, qris, komisiPlusOps, setoranCash
   };
 
   $("submitBtn").disabled = true;
@@ -660,6 +752,7 @@ $("submitBtn").addEventListener("click", async () => {
     $("modalInput").value = "";
     $("qrisInput").value = "";
     renderEntryForm();
+    renderReport(reportSnapshot);
   }catch(err){
     const q = getQueue();
     q.push(payload);
@@ -746,6 +839,40 @@ async function deleteMenu(nama){
     $("menuStatusMsg").className = "status err";
   }
 }
+
+function renderReport(snapshot){
+  const rider = snapshot.rider;
+  const tanggalObj = new Date(snapshot.tanggal + "T00:00:00");
+  const tanggalStr = tanggalObj.toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  $("reportSubtitle").textContent = `${rider} · ${tanggalStr}`;
+
+  $("reportMenuList").innerHTML = snapshot.items.map(item => {
+    const sisa = item.stockAwal - item.terjual;
+    return `
+      <div class="report-item">
+        <div>
+          <div class="name">${item.menu}</div>
+          <div class="qty">Stock Awal ${item.stockAwal} · Terjual ${item.terjual} · Sisa ${sisa} ${item.satuan}</div>
+        </div>
+        <div class="rp">${formatRupiah(item.terjual * item.harga)}</div>
+      </div>`;
+  }).join("");
+
+  $("reportRpMinuman").textContent = formatRupiah(snapshot.rpMinuman);
+  $("reportRpCookies").textContent = formatRupiah(snapshot.rpCookies);
+  $("reportGrandTotal").textContent = formatRupiah(snapshot.grandTotal);
+
+  $("reportModal").textContent = formatRupiah(snapshot.modal);
+  $("reportQris").textContent = formatRupiah(snapshot.qris);
+  $("reportKomisiOps").textContent = formatRupiah(snapshot.komisiPlusOps);
+  $("reportSetoran").textContent = formatRupiah(snapshot.setoranCash);
+
+  showScreen("reportScreen");
+}
+
+$("backToEntryBtn").addEventListener("click", () => {
+  showScreen("entryScreen");
+});
 
 $("addMenuBtn").addEventListener("click", async () => {
   const nama = $("newMenuName").value.trim();
