@@ -1,4 +1,4 @@
-const CACHE_NAME = "catatan-penjualan-v6";
+const CACHE_NAME = "catatan-penjualan-v7";
 const ASSETS = ["./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./logo-header.png"];
 
 self.addEventListener("install", (event) => {

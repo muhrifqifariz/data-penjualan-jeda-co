@@ -88,12 +88,18 @@
     color:var(--ink-soft); margin:18px 0 6px; font-weight:700;
     display:flex; align-items:center; justify-content:space-between;
     cursor:pointer; background:none; border:none; width:100%;
-    padding:8px 0 6px; font-family:inherit;
+    padding:10px 0 8px; font-family:inherit;
   }
-  .menu-group-title .chevron{
-    font-size:11px; transition:transform 0.15s ease; color:var(--emerald);
+  .menu-group-title .toggle-icon{
+    flex-shrink:0;
+    width:28px; height:28px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; font-weight:700; line-height:1;
+    background:var(--emerald); color:#fff;
   }
-  .menu-group.collapsed .menu-group-title .chevron{ transform:rotate(-90deg); }
+  .menu-group.collapsed .menu-group-title .toggle-icon{
+    background:var(--paper-2); color:var(--emerald); border:1.5px solid var(--emerald);
+  }
   .menu-group.collapsed .menu-group-items{ display:none; }
   .menu-item{
     border-top:1px solid var(--line); padding:12px 0;
@@ -270,10 +276,6 @@
         <span>QRIS</span>
         <input type="text" id="qrisInput" inputmode="numeric" placeholder="Rp0">
       </div>
-      <div class="setoran-row static">
-        <span>Biaya Operasional</span>
-        <span class="rp" id="operasionalVal">Rp0</span>
-      </div>
       <div class="setoran-result">
         <span class="label">Setoran Cash</span>
         <span class="val" id="setoranCashVal">Rp0</span>
@@ -373,7 +375,6 @@ async function loadMenu(){
     menuData = data.menu || [];
     aturanData = data.aturan || {};
     operasionalValue = data.operasional || 0;
-    $("operasionalVal").textContent = formatRupiah(operasionalValue);
 
     const savedRider = localStorage.getItem("nama_rider") || "";
     const select = $("riderInput");
@@ -393,7 +394,6 @@ async function loadMenu(){
     if(cachedAturan) aturanData = JSON.parse(cachedAturan);
     if(cachedOperasional){
       operasionalValue = JSON.parse(cachedOperasional);
-      $("operasionalVal").textContent = formatRupiah(operasionalValue);
     }
   }
   renderEntryForm();
@@ -416,12 +416,13 @@ function renderEntryForm(){
       ? menuData.filter(m => m.kategori === "Cookies")
       : menuData.filter(m => m.kategori === "Minuman" && m.subKategori === sub);
     if(!items.length) return;
-    const collapsed = localStorage.getItem("group_collapsed:" + sub) === "1";
+    const stored = localStorage.getItem("group_collapsed:" + sub);
+    const collapsed = stored === null ? true : stored === "1"; // default: collapsed
     html += `
       <div class="menu-group${collapsed ? ' collapsed' : ''}" data-group="${sub}">
         <button type="button" class="menu-group-title">
           <span>${SUBKATEGORI_LABEL[sub]}</span>
-          <span class="chevron">▾</span>
+          <span class="toggle-icon">${collapsed ? '+' : '−'}</span>
         </button>
         <div class="menu-group-items">`;
     items.forEach((m) => {
@@ -457,6 +458,7 @@ function renderEntryForm(){
       const group = btn.closest(".menu-group");
       const sub = group.dataset.group;
       const nowCollapsed = group.classList.toggle("collapsed");
+      btn.querySelector(".toggle-icon").textContent = nowCollapsed ? "+" : "−";
       localStorage.setItem("group_collapsed:" + sub, nowCollapsed ? "1" : "0");
     });
   });
@@ -532,7 +534,7 @@ function renderKomisiCard(cupMinuman, cupCookies){
   const totalKomisi = komisiMin.total + komisiCook.total;
   komisiTotalRp = totalKomisi;
 
-  let html = `<h2>Aturan Komisi</h2>`;
+  let html = `<h2>Komisi &amp; Operasional</h2>`;
   if(minAturan){
     html += `
       <p class="komisi-group">Minuman</p>
@@ -549,6 +551,14 @@ function renderKomisiCard(cupMinuman, cupCookies){
     <div class="komisi-estimate">
       <span class="label">Estimasi komisi hari ini</span>
       <span class="val">${formatRupiah(totalKomisi)}</span>
+    </div>
+    <div class="komisi-row" style="padding-top:2px;">
+      <span>Biaya Operasional</span>
+      <span class="rp">${formatRupiah(operasionalValue)}</span>
+    </div>
+    <div class="komisi-estimate">
+      <span class="label">Total Komisi + Operasional</span>
+      <span class="val">${formatRupiah(totalKomisi + operasionalValue)}</span>
     </div>`;
   card.innerHTML = html;
   updateSetoranCash();
@@ -557,7 +567,6 @@ function renderKomisiCard(cupMinuman, cupCookies){
 function updateSetoranCash(){
   const modal = parseRupiahInput($("modalInput"));
   const qris = parseRupiahInput($("qrisInput"));
-  $("operasionalVal").textContent = formatRupiah(operasionalValue);
   const setoran = grandTotalRp + modal - qris - komisiTotalRp - operasionalValue;
   const el = $("setoranCashVal");
   el.textContent = formatRupiah(setoran);
