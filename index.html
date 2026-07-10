@@ -86,7 +86,15 @@
   .menu-group-title{
     font-size:12px; text-transform:uppercase; letter-spacing:.08em;
     color:var(--ink-soft); margin:18px 0 6px; font-weight:700;
+    display:flex; align-items:center; justify-content:space-between;
+    cursor:pointer; background:none; border:none; width:100%;
+    padding:8px 0 6px; font-family:inherit;
   }
+  .menu-group-title .chevron{
+    font-size:11px; transition:transform 0.15s ease; color:var(--emerald);
+  }
+  .menu-group.collapsed .menu-group-title .chevron{ transform:rotate(-90deg); }
+  .menu-group.collapsed .menu-group-items{ display:none; }
   .menu-item{
     border-top:1px solid var(--line); padding:12px 0;
   }
@@ -256,11 +264,11 @@
       <h2>Setoran</h2>
       <div class="setoran-row">
         <span>Modal (Kembalian)</span>
-        <input type="number" id="modalInput" inputmode="numeric" placeholder="0" min="0">
+        <input type="text" id="modalInput" inputmode="numeric" placeholder="Rp0">
       </div>
       <div class="setoran-row">
         <span>QRIS</span>
-        <input type="number" id="qrisInput" inputmode="numeric" placeholder="0" min="0">
+        <input type="text" id="qrisInput" inputmode="numeric" placeholder="Rp0">
       </div>
       <div class="setoran-row static">
         <span>Biaya Operasional</span>
@@ -299,7 +307,7 @@
         </div>
         <div>
           <label for="newMenuHarga">Harga (Rp)</label>
-          <input type="number" id="newMenuHarga" placeholder="0">
+          <input type="text" id="newMenuHarga" inputmode="numeric" placeholder="Rp0">
         </div>
       </div>
       <button class="primary" id="addMenuBtn" style="margin-bottom:16px;">Tambah Menu</button>
@@ -339,8 +347,23 @@ $("riderInput").addEventListener("change", () => {
 });
 $("modalInput").addEventListener("input", updateSetoranCash);
 $("qrisInput").addEventListener("input", updateSetoranCash);
+attachRupiahInput($("modalInput"));
+attachRupiahInput($("qrisInput"));
+attachRupiahInput($("newMenuHarga"));
 
 function formatRupiah(n){ return "Rp" + Math.round(n || 0).toLocaleString("id-ID"); }
+
+// Format input angka jadi "Rp##.###" (titik ribuan, tanpa koma) saat diketik.
+function attachRupiahInput(input){
+  input.addEventListener("input", () => {
+    const raw = input.value.replace(/[^\d]/g, "");
+    input.value = raw ? "Rp" + Number(raw).toLocaleString("id-ID") : "";
+  });
+}
+// Ambil nilai numerik murni dari input yang sudah diformat "Rp##.###".
+function parseRupiahInput(input){
+  return parseInt(input.value.replace(/[^\d]/g, ""), 10) || 0;
+}
 
 // ---------- Load menu, rider, & aturan dari server ----------
 async function loadMenu(){
@@ -393,7 +416,14 @@ function renderEntryForm(){
       ? menuData.filter(m => m.kategori === "Cookies")
       : menuData.filter(m => m.kategori === "Minuman" && m.subKategori === sub);
     if(!items.length) return;
-    html += `<p class="menu-group-title">${SUBKATEGORI_LABEL[sub]}</p>`;
+    const collapsed = localStorage.getItem("group_collapsed:" + sub) === "1";
+    html += `
+      <div class="menu-group${collapsed ? ' collapsed' : ''}" data-group="${sub}">
+        <button type="button" class="menu-group-title">
+          <span>${SUBKATEGORI_LABEL[sub]}</span>
+          <span class="chevron">▾</span>
+        </button>
+        <div class="menu-group-items">`;
     items.forEach((m) => {
       const satuan = m.satuan || (m.kategori === "Cookies" ? "pcs" : "cup");
       html += `
@@ -418,8 +448,18 @@ function renderEntryForm(){
           </div>
         </div>`;
     });
+    html += `</div></div>`;
   });
   card.innerHTML = html || "<p>Belum ada menu. Tambahkan lewat tab \"Kelola Menu\".</p>";
+
+  card.querySelectorAll(".menu-group-title").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const group = btn.closest(".menu-group");
+      const sub = group.dataset.group;
+      const nowCollapsed = group.classList.toggle("collapsed");
+      localStorage.setItem("group_collapsed:" + sub, nowCollapsed ? "1" : "0");
+    });
+  });
 
   card.querySelectorAll(".menu-item").forEach(item => {
     const stockInput = item.querySelector(".stockAwal");
@@ -515,8 +555,8 @@ function renderKomisiCard(cupMinuman, cupCookies){
 }
 
 function updateSetoranCash(){
-  const modal = parseFloat($("modalInput").value) || 0;
-  const qris = parseFloat($("qrisInput").value) || 0;
+  const modal = parseRupiahInput($("modalInput"));
+  const qris = parseRupiahInput($("qrisInput"));
   $("operasionalVal").textContent = formatRupiah(operasionalValue);
   const setoran = grandTotalRp + modal - qris - komisiTotalRp - operasionalValue;
   const el = $("setoranCashVal");
@@ -591,8 +631,8 @@ $("submitBtn").addEventListener("click", async () => {
   }
 
   localStorage.setItem("nama_rider", rider);
-  const modal = parseFloat($("modalInput").value) || 0;
-  const qris = parseFloat($("qrisInput").value) || 0;
+  const modal = parseRupiahInput($("modalInput"));
+  const qris = parseRupiahInput($("qrisInput"));
   const setoranCash = grandTotalRp + modal - qris - komisiTotalRp - operasionalValue;
   const payload = {
     action: "entry", rider, tanggal: $("tanggalInput").value, items,
@@ -702,7 +742,7 @@ $("addMenuBtn").addEventListener("click", async () => {
   const nama = $("newMenuName").value.trim();
   const sub = $("newMenuSub").value;
   const kategori = deriveKategori(sub);
-  const harga = parseFloat($("newMenuHarga").value) || 0;
+  const harga = parseRupiahInput($("newMenuHarga"));
   if(!nama){
     $("menuStatusMsg").textContent = "Nama menu wajib diisi";
     $("menuStatusMsg").className = "status err";
