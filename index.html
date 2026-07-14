@@ -112,6 +112,20 @@
   .menu-item-name{ font-size:15px; font-weight:600; margin-bottom:2px; }
   .menu-item-harga{ font-size:12.5px; color:var(--ink-soft); margin-bottom:8px; }
   .menu-item .row2 input{ background:var(--blue-bg); border-color:#B9DCF2; }
+  .stepper{
+    display:flex; align-items:stretch; gap:8px;
+  }
+  .stepper input{
+    text-align:center; font-size:18px; font-weight:700;
+    background:var(--blue-bg); border-color:#B9DCF2; padding:8px 4px;
+  }
+  .step-btn{
+    flex-shrink:0; width:44px; border:none; border-radius:10px;
+    background:var(--emerald); color:#fff; font-size:22px; font-weight:700;
+    cursor:pointer; line-height:1;
+  }
+  .step-btn:active{ background:var(--emerald-dark); }
+  .step-btn.minus{ background:var(--paper-2); color:var(--danger); border:1.5px solid var(--danger); }
   .menu-item-calc{
     display:flex; justify-content:space-between; font-size:12.5px;
     color:var(--ink-soft); margin-top:8px;
@@ -293,6 +307,10 @@
       <input type="date" id="tanggalInput">
     </div>
 
+    <p style="text-align:center; font-size:12px; color:var(--ink-soft); margin:0 0 12px;">
+      Tiap tombol +/− atau angka yang diketik langsung tersimpan ke Sheet
+    </p>
+
     <div class="card" id="menuListCard">
       <!-- diisi otomatis lewat JS dari daftar menu -->
     </div>
@@ -330,7 +348,7 @@
       </div>
     </div>
 
-    <button class="primary" id="submitBtn">Kirim Semua Data</button>
+    <button class="primary" id="submitBtn">Tutup Hari Ini</button>
     <p class="status" id="statusMsg"></p>
     <p class="queue-note" id="queueNote"></p>
   </section>
@@ -430,6 +448,12 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 $("tanggalInput").value = new Date().toISOString().slice(0,10);
 $("riderInput").addEventListener("change", () => {
   localStorage.setItem("nama_rider", $("riderInput").value);
+  renderEntryForm();
+  loadSession();
+});
+$("tanggalInput").addEventListener("change", () => {
+  renderEntryForm();
+  loadSession();
 });
 $("modalInput").addEventListener("input", updateSetoranCash);
 $("qrisInput").addEventListener("input", updateSetoranCash);
@@ -438,6 +462,67 @@ attachRupiahInput($("qrisInput"));
 attachRupiahInput($("newMenuHarga"));
 
 function formatRupiah(n){ return "Rp" + Math.round(n || 0).toLocaleString("id-ID"); }
+
+function debounce(fn, delay){
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+}
+
+// Kirim perubahan 1 item ke server (real-time). Kalau gagal (offline),
+// masuk antrean dan dicoba ulang otomatis saat online lagi.
+async function pushItemChange(payload){
+  try{
+    await sendToServer(payload);
+  }catch(e){
+    const q = getQueue();
+    q.push(payload);
+    saveQueue(q);
+    refreshQueueNote();
+  }
+}
+function itemPayloadBase(item){
+  return {
+    rider: $("riderInput").value.trim(),
+    tanggal: $("tanggalInput").value,
+    menu: item.dataset.menu, kategori: item.dataset.kategori,
+    subKategori: item.dataset.sub, satuan: item.dataset.satuan,
+    konversi: parseFloat(item.dataset.konversi) || 1,
+    harga: parseFloat(item.dataset.harga) || 0
+  };
+}
+function adjustItemField(item, field, delta){
+  if(!$("riderInput").value.trim()) return; // belum pilih rider, jangan sync dulu
+  pushItemChange(Object.assign(itemPayloadBase(item), { action: "adjustItem", field, delta }));
+}
+function syncItemField(item, field, value){
+  if(!$("riderInput").value.trim()) return;
+  pushItemChange(Object.assign(itemPayloadBase(item), { action: "setItemField", field, value }));
+}
+
+// Muat ulang tally Stock Awal/Terjual/Modal/QRIS yang sudah tersimpan
+// utk kombinasi rider+tanggal saat ini (mis. rider tadi sudah tap
+// beberapa kali, lalu app ditutup & dibuka lagi).
+async function loadSession(){
+  const rider = $("riderInput").value.trim();
+  const tanggal = $("tanggalInput").value;
+  if(!rider || !tanggal) return;
+  try{
+    const res = await fetch(`${SCRIPT_URL}?action=getSession&rider=${encodeURIComponent(rider)}&tanggal=${encodeURIComponent(tanggal)}`);
+    const data = await res.json();
+    if(data.status !== "ok") return;
+    document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
+      const info = data.items ? data.items[item.dataset.menu] : null;
+      item.querySelector(".stockAwal").value = info && info.stockAwal ? info.stockAwal : "";
+      item.querySelector(".terjual").value = info && info.terjual ? info.terjual : "";
+      item.querySelector(".terjual").dispatchEvent(new Event("input"));
+    });
+    $("modalInput").value = data.modal ? "Rp" + Number(data.modal).toLocaleString("id-ID") : "";
+    $("qrisInput").value = data.qris ? "Rp" + Number(data.qris).toLocaleString("id-ID") : "";
+    updateSetoranCash();
+  }catch(e){
+    // offline/gagal muat sesi -> biarkan kosong, rider tetap bisa tap dari 0
+  }
+}
 
 // Format input angka jadi "Rp##.###" (titik ribuan, tanpa koma) saat diketik.
 function attachRupiahInput(input){
@@ -482,6 +567,7 @@ async function loadMenu(){
   }
   renderEntryForm();
   renderKomisiCard();
+  loadSession();
 }
 
 const SUBKATEGORI_ORDER = ["Cup", "500 ml", "1 Liter", "Cookies"];
@@ -524,7 +610,11 @@ function renderEntryForm(){
             </div>
             <div>
               <label style="margin:0 0 4px;">Terjual (${satuan})</label>
-              <input type="number" class="terjual" inputmode="numeric" placeholder="0" min="0">
+              <div class="stepper">
+                <button type="button" class="step-btn minus">−</button>
+                <input type="number" class="terjual" inputmode="numeric" placeholder="0" min="0">
+                <button type="button" class="step-btn plus">+</button>
+              </div>
             </div>
           </div>
           <div class="menu-item-calc">
@@ -553,15 +643,34 @@ function renderEntryForm(){
     const sisaVal = item.querySelector(".sisaVal");
     const totalVal = item.querySelector(".totalVal");
     const harga = parseFloat(item.dataset.harga) || 0;
-    function recalc(){
+    function recalcDisplay(){
       const s = parseFloat(stockInput.value) || 0;
       const t = parseFloat(terjualInput.value) || 0;
       sisaVal.textContent = s - t;
       totalVal.textContent = formatRupiah(t * harga);
       updateGrandTotal();
     }
-    stockInput.addEventListener("input", recalc);
-    terjualInput.addEventListener("input", recalc);
+    const debouncedSyncStock = debounce(() => {
+      syncItemField(item, "stockAwal", parseFloat(stockInput.value) || 0);
+    }, 700);
+    const debouncedSyncTerjual = debounce(() => {
+      syncItemField(item, "terjual", parseFloat(terjualInput.value) || 0);
+    }, 700);
+
+    stockInput.addEventListener("input", () => { recalcDisplay(); debouncedSyncStock(); });
+    terjualInput.addEventListener("input", () => { recalcDisplay(); debouncedSyncTerjual(); });
+
+    item.querySelector(".step-btn.plus").addEventListener("click", () => {
+      terjualInput.value = (parseFloat(terjualInput.value) || 0) + 1;
+      recalcDisplay();
+      adjustItemField(item, "terjual", 1);
+    });
+    item.querySelector(".step-btn.minus").addEventListener("click", () => {
+      const cur = parseFloat(terjualInput.value) || 0;
+      terjualInput.value = Math.max(0, cur - 1);
+      recalcDisplay();
+      adjustItemField(item, "terjual", -1);
+    });
   });
   updateGrandTotal();
 }
@@ -695,7 +804,7 @@ async function flushQueue(){
 }
 window.addEventListener("online", flushQueue);
 
-// ---------- Submit entry ----------
+// ---------- Tutup Hari Ini (isi Modal/QRIS, tampilkan laporan) ----------
 $("submitBtn").addEventListener("click", async () => {
   const rider = $("riderInput").value.trim();
   if(!rider){
@@ -703,27 +812,20 @@ $("submitBtn").addEventListener("click", async () => {
     $("statusMsg").className = "status err";
     return;
   }
+  // Kumpulkan item yang ada isinya, HANYA utk ditampilkan di halaman
+  // Report -- data Stock Awal/Terjual sendiri sudah tersimpan real-time
+  // sejak tadi (tiap tap +/- atau tiap ketik langsung), tidak dikirim
+  // ulang di sini.
   const items = [];
   document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
     const s = parseFloat(item.querySelector(".stockAwal").value) || 0;
     const t = parseFloat(item.querySelector(".terjual").value) || 0;
-    if(s === 0 && t === 0) return; // lewati item yang tidak diisi
+    if(s === 0 && t === 0) return;
     items.push({
-      menu: item.dataset.menu,
-      kategori: item.dataset.kategori,
-      subKategori: item.dataset.sub,
-      satuan: item.dataset.satuan,
-      konversi: parseFloat(item.dataset.konversi) || 1,
-      harga: parseFloat(item.dataset.harga) || 0,
-      stockAwal: s,
-      terjual: t
+      menu: item.dataset.menu, satuan: item.dataset.satuan,
+      harga: parseFloat(item.dataset.harga) || 0, stockAwal: s, terjual: t
     });
   });
-  if(!items.length){
-    $("statusMsg").textContent = "Isi minimal satu menu";
-    $("statusMsg").className = "status err";
-    return;
-  }
 
   localStorage.setItem("nama_rider", rider);
   const modal = parseRupiahInput($("modalInput"));
@@ -731,7 +833,7 @@ $("submitBtn").addEventListener("click", async () => {
   const komisiPlusOps = komisiTotalRp + operasionalValue;
   const setoranCash = grandTotalRp + modal - qris - komisiTotalRp - operasionalValue;
   const payload = {
-    action: "entry", rider, tanggal: $("tanggalInput").value, items,
+    action: "closeSession", rider, tanggal: $("tanggalInput").value,
     totalPenjualan: grandTotalRp, totalKomisi: komisiTotalRp,
     modal, qris, operasional: operasionalValue, setoranCash
   };
@@ -742,7 +844,7 @@ $("submitBtn").addEventListener("click", async () => {
   };
 
   $("submitBtn").disabled = true;
-  $("statusMsg").textContent = "Mengirim...";
+  $("statusMsg").textContent = "Menyimpan...";
   $("statusMsg").className = "status";
 
   try{
@@ -751,16 +853,15 @@ $("submitBtn").addEventListener("click", async () => {
     $("statusMsg").className = "status ok";
     $("modalInput").value = "";
     $("qrisInput").value = "";
-    renderEntryForm();
     renderReport(reportSnapshot);
   }catch(err){
     const q = getQueue();
     q.push(payload);
     saveQueue(q);
     refreshQueueNote();
-    $("statusMsg").textContent = "Tidak ada koneksi — data disimpan sementara di HP";
+    $("statusMsg").textContent = "Tidak ada koneksi — akan dicoba ulang otomatis";
     $("statusMsg").className = "status err";
-    renderEntryForm();
+    renderReport(reportSnapshot);
   }finally{
     $("submitBtn").disabled = false;
   }
