@@ -215,6 +215,9 @@
   .status{ text-align:center; font-size:13px; min-height:18px; margin-bottom:8px; color:var(--ink-soft); }
   .status.ok{ color:var(--emerald-dark); font-weight:600; }
   .status.err{ color:var(--danger); font-weight:600; }
+  .sync-status{ font-size:12px; color:var(--ink-soft); transition:color .2s; }
+  .sync-status.ok{ color:var(--emerald-dark); font-weight:600; }
+  .sync-status.err{ color:var(--danger); font-weight:600; }
   .queue-note{ text-align:center; font-size:12px; color:var(--ink-soft); margin-bottom:16px; }
   .queue-note b{ color:var(--gold); }
 
@@ -303,11 +306,12 @@
         <option value="">— Pilih Rider —</option>
       </select>
 
-      <label for="tanggalInput">Tanggal</label>
-      <input type="date" id="tanggalInput">
+      <label>Tanggal</label>
+      <div id="tanggalDisplay" style="padding:11px 12px; background:var(--paper-2); border:1.5px solid var(--line); border-radius:10px; font-size:15.5px; color:var(--ink-soft);"></div>
+      <input type="hidden" id="tanggalInput">
     </div>
 
-    <p style="text-align:center; font-size:12px; color:var(--ink-soft); margin:0 0 12px;">
+    <p class="sync-status" id="syncStatus" style="text-align:center; margin:0 0 12px;">
       Tiap tombol +/− atau angka yang diketik langsung tersimpan ke Sheet
     </p>
 
@@ -444,14 +448,16 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
   });
 });
 
-// ---------- Init nama rider & tanggal ----------
-$("tanggalInput").value = new Date().toISOString().slice(0,10);
+// ---------- Init nama rider & tanggal (otomatis hari ini, tidak bisa diubah) ----------
+function setTanggalHariIni(){
+  const today = new Date();
+  $("tanggalInput").value = today.toISOString().slice(0,10);
+  $("tanggalDisplay").textContent = today.toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+}
+setTanggalHariIni();
 $("riderInput").addEventListener("change", () => {
   localStorage.setItem("nama_rider", $("riderInput").value);
-  renderEntryForm();
-  loadSession();
-});
-$("tanggalInput").addEventListener("change", () => {
+  setTanggalHariIni(); // jaga-jaga kalau app dibiarkan terbuka lewat tengah malam
   renderEntryForm();
   loadSession();
 });
@@ -468,16 +474,32 @@ function debounce(fn, delay){
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
 }
 
-// Kirim perubahan 1 item ke server (real-time). Kalau gagal (offline),
-// masuk antrean dan dicoba ulang otomatis saat online lagi.
+// Kirim perubahan 1 item ke server (real-time). Kalau gagal (offline
+// atau server menolak), masuk antrean dan tampilkan status supaya
+// KELIHATAN kalau gagal (tidak lagi diam-diam gagal).
+let pendingSync = 0;
+function setSyncStatus(text, cls){
+  const el = $("syncStatus");
+  if(!el) return;
+  el.textContent = text;
+  el.className = "sync-status" + (cls ? " " + cls : "");
+}
 async function pushItemChange(payload){
+  pendingSync++;
+  setSyncStatus("Menyimpan...", "");
   try{
     await sendToServer(payload);
+    pendingSync = Math.max(0, pendingSync - 1);
+    if(pendingSync === 0) setSyncStatus("Tersimpan ✓", "ok");
   }catch(e){
+    pendingSync = Math.max(0, pendingSync - 1);
     const q = getQueue();
     q.push(payload);
     saveQueue(q);
     refreshQueueNote();
+    setSyncStatus("Gagal tersimpan (" + (e.message || "error") + ") — dicoba lagi otomatis", "err");
+    // coba lagi sebentar lagi, jangan tunggu event 'online' saja
+    setTimeout(flushQueue, 4000);
   }
 }
 function itemPayloadBase(item){
@@ -801,6 +823,7 @@ async function flushQueue(){
   }
   saveQueue(remaining);
   refreshQueueNote();
+  if(remaining.length === 0 && q.length > 0) setSyncStatus("Tersimpan ✓", "ok");
 }
 window.addEventListener("online", flushQueue);
 
@@ -1009,6 +1032,7 @@ $("addMenuBtn").addEventListener("click", async () => {
 // ---------- Start ----------
 loadMenu();
 if(navigator.onLine) flushQueue();
+setInterval(() => { if(navigator.onLine && getQueue().length) flushQueue(); }, 20000);
 if("serviceWorker" in navigator){
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").catch(()=>{});
