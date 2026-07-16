@@ -126,6 +126,10 @@
   }
   .step-btn:active{ background:var(--emerald-dark); }
   .step-btn.minus{ background:var(--paper-2); color:var(--danger); border:1.5px solid var(--danger); }
+  .stock-readonly{
+    padding:9px 12px; background:var(--paper-2); border:1.5px solid var(--line);
+    border-radius:10px; font-size:15px; font-weight:600; color:var(--ink-soft);
+  }
   .menu-item-calc{
     display:flex; justify-content:space-between; font-size:12.5px;
     color:var(--ink-soft); margin-top:8px;
@@ -449,9 +453,15 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 });
 
 // ---------- Init nama rider & tanggal (otomatis hari ini, tidak bisa diubah) ----------
+function localDateStr(d){
+  // toISOString() pakai UTC -> di jam 00:00-06:59 WIB bisa kebaca
+  // tanggal KEMARIN (karena WIB = UTC+7). Ini versi yang ikut zona
+  // waktu HP (harus WIB), pakai locale en-CA supaya formatnya YYYY-MM-DD.
+  return d.toLocaleDateString("en-CA");
+}
 function setTanggalHariIni(){
   const today = new Date();
-  $("tanggalInput").value = today.toISOString().slice(0,10);
+  $("tanggalInput").value = localDateStr(today);
   $("tanggalDisplay").textContent = today.toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
 }
 setTanggalHariIni();
@@ -502,23 +512,22 @@ async function pushItemChange(payload){
     setTimeout(flushQueue, 4000);
   }
 }
-function itemPayloadBase(item){
+function itemPayloadBase(item, rider, tanggal){
   return {
-    rider: $("riderInput").value.trim(),
-    tanggal: $("tanggalInput").value,
+    rider, tanggal,
     menu: item.dataset.menu, kategori: item.dataset.kategori,
     subKategori: item.dataset.sub, satuan: item.dataset.satuan,
     konversi: parseFloat(item.dataset.konversi) || 1,
     harga: parseFloat(item.dataset.harga) || 0
   };
 }
-function adjustItemField(item, field, delta){
-  if(!$("riderInput").value.trim()) return; // belum pilih rider, jangan sync dulu
-  pushItemChange(Object.assign(itemPayloadBase(item), { action: "adjustItem", field, delta }));
+function adjustItemField(item, field, delta, rider, tanggal){
+  if(!rider) return; // belum pilih rider, jangan sync dulu
+  pushItemChange(Object.assign(itemPayloadBase(item, rider, tanggal), { action: "adjustItem", field, delta }));
 }
-function syncItemField(item, field, value){
-  if(!$("riderInput").value.trim()) return;
-  pushItemChange(Object.assign(itemPayloadBase(item), { action: "setItemField", field, value }));
+function syncItemField(item, field, value, rider, tanggal){
+  if(!rider) return;
+  pushItemChange(Object.assign(itemPayloadBase(item, rider, tanggal), { action: "setItemField", field, value }));
 }
 
 // Muat ulang tally Stock Awal/Terjual/Modal/QRIS yang sudah tersimpan
@@ -534,7 +543,9 @@ async function loadSession(){
     if(data.status !== "ok") return;
     document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
       const info = data.items ? data.items[item.dataset.menu] : null;
-      item.querySelector(".stockAwal").value = info && info.stockAwal ? info.stockAwal : "";
+      const stockAwal = info && info.stockAwal ? info.stockAwal : 0;
+      item.querySelector(".stockAwal").value = stockAwal;
+      item.querySelector(".stockAwal-val").textContent = stockAwal;
       item.querySelector(".terjual").value = info && info.terjual ? info.terjual : "";
       item.querySelector(".terjual").dispatchEvent(new Event("input"));
     });
@@ -602,6 +613,13 @@ const SUBKATEGORI_LABEL = {
 
 function renderEntryForm(){
   const card = $("menuListCard");
+  // Tangkap rider & tanggal SEKALI di sini, dipakai terus utk semua sync
+  // item di render ini -- supaya kalau owner pindah rider sebelum sync
+  // sempat jalan (debounce), datanya tetap tercatat ke rider yang BENAR
+  // (bukan rider yang baru dipilih setelahnya).
+  const sessionRider = $("riderInput").value.trim();
+  const sessionTanggal = $("tanggalInput").value;
+
   let html = "";
   SUBKATEGORI_ORDER.forEach(sub => {
     const items = sub === "Cookies"
@@ -628,7 +646,10 @@ function renderEntryForm(){
           <div class="row2">
             <div>
               <label style="margin:0 0 4px;">Stock Awal (${satuan})</label>
-              <input type="number" class="stockAwal" inputmode="numeric" placeholder="0" min="0">
+              <div class="stock-readonly">
+                <span class="stockAwal-val">0</span>
+              </div>
+              <input type="hidden" class="stockAwal" value="0">
             </div>
             <div>
               <label style="margin:0 0 4px;">Terjual (${satuan})</label>
@@ -672,26 +693,22 @@ function renderEntryForm(){
       totalVal.textContent = formatRupiah(t * harga);
       updateGrandTotal();
     }
-    const debouncedSyncStock = debounce(() => {
-      syncItemField(item, "stockAwal", parseFloat(stockInput.value) || 0);
-    }, 700);
     const debouncedSyncTerjual = debounce(() => {
-      syncItemField(item, "terjual", parseFloat(terjualInput.value) || 0);
+      syncItemField(item, "terjual", parseFloat(terjualInput.value) || 0, sessionRider, sessionTanggal);
     }, 700);
 
-    stockInput.addEventListener("input", () => { recalcDisplay(); debouncedSyncStock(); });
     terjualInput.addEventListener("input", () => { recalcDisplay(); debouncedSyncTerjual(); });
 
     item.querySelector(".step-btn.plus").addEventListener("click", () => {
       terjualInput.value = (parseFloat(terjualInput.value) || 0) + 1;
       recalcDisplay();
-      adjustItemField(item, "terjual", 1);
+      adjustItemField(item, "terjual", 1, sessionRider, sessionTanggal);
     });
     item.querySelector(".step-btn.minus").addEventListener("click", () => {
       const cur = parseFloat(terjualInput.value) || 0;
       terjualInput.value = Math.max(0, cur - 1);
       recalcDisplay();
-      adjustItemField(item, "terjual", -1);
+      adjustItemField(item, "terjual", -1, sessionRider, sessionTanggal);
     });
   });
   updateGrandTotal();
