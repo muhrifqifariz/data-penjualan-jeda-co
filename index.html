@@ -398,6 +398,9 @@
       <button class="primary" id="addMenuBtn" style="margin-bottom:16px;">Tambah Menu</button>
     </div>
     <p class="status" id="menuStatusMsg"></p>
+    <p style="text-align:center; font-size:11px; color:var(--ink-soft); margin-top:20px;">
+      Versi aplikasi: <span id="appVersionLabel"></span>
+    </p>
   </section>
 
   <!-- ===================== SCREEN: REPORT ===================== -->
@@ -436,6 +439,8 @@
 <script>
 // ================== KONFIGURASI ==================
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbys_3TssKzKvycmsQqI8MHg12aqUnFUpuTl8ZACXAyUrK5mnWNsaC1bmbMd1Tt8GhTl/exec";
+const APP_VERSION = "2026-07-25-riwayat-v1"; // ganti tiap update, buat cek device mana yg belum update
+document.getElementById("appVersionLabel").textContent = APP_VERSION;
 // ==================================================
 
 const $ = (id) => document.getElementById(id);
