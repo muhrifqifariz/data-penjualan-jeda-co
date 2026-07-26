@@ -439,7 +439,7 @@
 <script>
 // ================== KONFIGURASI ==================
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbys_3TssKzKvycmsQqI8MHg12aqUnFUpuTl8ZACXAyUrK5mnWNsaC1bmbMd1Tt8GhTl/exec";
-const APP_VERSION = "2026-07-25-riwayat-v1"; // ganti tiap update, buat cek device mana yg belum update
+const APP_VERSION = "2026-07-26-antidobel-v1"; // ganti tiap update, buat cek device mana yg belum update
 document.getElementById("appVersionLabel").textContent = APP_VERSION;
 // ==================================================
 
@@ -525,7 +525,12 @@ function setSyncStatus(text, cls){
   el.textContent = text;
   el.className = "sync-status" + (cls ? " " + cls : "");
 }
+function generateRequestId(){
+  return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+}
 async function pushItemChange(payload){
+  payload.requestId = generateRequestId(); // ID unik tetap sama walau di-retry, buat cegah dobel di server
+  payload.queuedAt = Date.now();
   pendingSync++;
   setSyncStatus("Menyimpan...", "");
   try{
@@ -864,16 +869,35 @@ async function sendToServer(payload){
   return data;
 }
 
+const MAX_QUEUE_AGE_MS = 3 * 60 * 60 * 1000; // 3 jam -- lebih dari ini, berhenti dicoba, jangan diulang selamanya
+let flushInProgress = false; // cegah 2 flushQueue() jalan bersamaan (ini biang kerok bug dobel kirim)
+
 async function flushQueue(){
-  let q = getQueue();
-  if(!q.length) return;
-  const remaining = [];
-  for(const item of q){
-    try{ await sendToServer(item); } catch(e){ remaining.push(item); }
+  if(flushInProgress) return; // sudah ada yang jalan, jangan tumpuk
+  flushInProgress = true;
+  try{
+    let q = getQueue();
+    if(!q.length) { flushInProgress = false; return; }
+    const now = Date.now();
+    let expiredCount = 0;
+    const remaining = [];
+    for(const item of q){
+      if(item.queuedAt && (now - item.queuedAt) > MAX_QUEUE_AGE_MS){
+        expiredCount++; // sudah lebih dari 3 jam gagal terus, buang, jangan diulang selamanya
+        continue;
+      }
+      try{ await sendToServer(item); } catch(e){ remaining.push(item); }
+    }
+    saveQueue(remaining);
+    refreshQueueNote();
+    if(expiredCount > 0){
+      setSyncStatus(expiredCount + " perubahan gagal tersimpan >3 jam & dibatalkan — cek & input ulang manual kalau perlu", "err");
+    } else if(remaining.length === 0 && q.length > 0){
+      setSyncStatus("Tersimpan ✓", "ok");
+    }
+  } finally {
+    flushInProgress = false;
   }
-  saveQueue(remaining);
-  refreshQueueNote();
-  if(remaining.length === 0 && q.length > 0) setSyncStatus("Tersimpan ✓", "ok");
 }
 window.addEventListener("online", flushQueue);
 
