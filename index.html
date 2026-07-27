@@ -320,7 +320,7 @@
     </div>
 
     <p class="sync-status" id="syncStatus" style="text-align:center; margin:0 0 12px;">
-      Tiap tombol +/− atau angka yang diketik langsung tersimpan ke Sheet
+      Tap +/− tersimpan di HP dulu — tekan "Tutup Hari Ini" utk kirim ke Sheet
     </p>
 
     <div class="card" id="menuListCard">
@@ -367,7 +367,6 @@
     <button class="primary" id="submitBtn">Tutup Hari Ini</button>
     <button class="secondary" id="editDataBtn" style="display:none;">Edit Data Hari Ini</button>
     <p class="status" id="statusMsg"></p>
-    <p class="queue-note" id="queueNote"></p>
   </section>
 
   <!-- ===================== SCREEN: KELOLA MENU ===================== -->
@@ -439,7 +438,7 @@
 <script>
 // ================== KONFIGURASI ==================
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbys_3TssKzKvycmsQqI8MHg12aqUnFUpuTl8ZACXAyUrK5mnWNsaC1bmbMd1Tt8GhTl/exec";
-const APP_VERSION = "2026-07-26-antidobel-v1"; // ganti tiap update, buat cek device mana yg belum update
+const APP_VERSION = "2026-07-27-lokal-final-v1"; // ganti tiap update, buat cek device mana yg belum update
 document.getElementById("appVersionLabel").textContent = APP_VERSION;
 // ==================================================
 
@@ -466,7 +465,8 @@ function applyLockState(closed){
 }
 $("editDataBtn").addEventListener("click", () => {
   applyLockState(false);
-  setSyncStatus("Mode edit aktif — perubahan akan tersimpan seperti biasa", "");
+  saveDraft($("riderInput").value.trim(), $("tanggalInput").value);
+  setSyncStatus("Mode edit aktif — ubah lalu tekan \"Tutup Hari Ini\" lagi", "");
 });
 
 // ---------- Tab switching ----------
@@ -502,8 +502,14 @@ $("riderInput").addEventListener("change", () => {
   renderEntryForm();
   loadSession();
 });
-$("modalInput").addEventListener("input", updateSetoranCash);
-$("qrisInput").addEventListener("input", updateSetoranCash);
+$("modalInput").addEventListener("input", () => {
+  updateSetoranCash();
+  if(!sessionClosed) saveDraft($("riderInput").value.trim(), $("tanggalInput").value);
+});
+$("qrisInput").addEventListener("input", () => {
+  updateSetoranCash();
+  if(!sessionClosed) saveDraft($("riderInput").value.trim(), $("tanggalInput").value);
+});
 attachRupiahInput($("modalInput"));
 attachRupiahInput($("qrisInput"));
 attachRupiahInput($("newMenuHarga"));
@@ -518,7 +524,6 @@ function debounce(fn, delay){
 // Kirim perubahan 1 item ke server (real-time). Kalau gagal (offline
 // atau server menolak), masuk antrean dan tampilkan status supaya
 // KELIHATAN kalau gagal (tidak lagi diam-diam gagal).
-let pendingSync = 0;
 function setSyncStatus(text, cls){
   const el = $("syncStatus");
   if(!el) return;
@@ -528,42 +533,29 @@ function setSyncStatus(text, cls){
 function generateRequestId(){
   return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
 }
-async function pushItemChange(payload){
-  payload.requestId = generateRequestId(); // ID unik tetap sama walau di-retry, buat cegah dobel di server
-  payload.queuedAt = Date.now();
-  pendingSync++;
-  setSyncStatus("Menyimpan...", "");
-  try{
-    await sendToServer(payload);
-    pendingSync = Math.max(0, pendingSync - 1);
-    if(pendingSync === 0) setSyncStatus("Tersimpan ✓", "ok");
-  }catch(e){
-    pendingSync = Math.max(0, pendingSync - 1);
-    const q = getQueue();
-    q.push(payload);
-    saveQueue(q);
-    refreshQueueNote();
-    setSyncStatus("Gagal tersimpan (" + (e.message || "error") + ") — dicoba lagi otomatis", "err");
-    // coba lagi sebentar lagi, jangan tunggu event 'online' saja
-    setTimeout(flushQueue, 4000);
-  }
-}
-function itemPayloadBase(item, rider, tanggal){
-  return {
-    rider, tanggal,
-    menu: item.dataset.menu, kategori: item.dataset.kategori,
-    subKategori: item.dataset.sub, satuan: item.dataset.satuan,
-    konversi: parseFloat(item.dataset.konversi) || 1,
-    harga: parseFloat(item.dataset.harga) || 0
+
+// ---------- Draft lokal (tap +/- & ketik langsung TIDAK kirim ke server,
+// cuma simpan di HP dulu, sampai "Tutup Hari Ini" ditekan) ----------
+function draftKey(rider, tanggal){ return "draft_" + rider + "_" + tanggal; }
+function saveDraft(rider, tanggal){
+  if(!rider || !tanggal) return;
+  const items = {};
+  document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
+    items[item.dataset.menu] = parseFloat(item.querySelector(".terjual").value) || 0;
+  });
+  const draft = {
+    items, modal: parseRupiahInput($("modalInput")), qris: parseRupiahInput($("qrisInput")),
+    savedAt: Date.now()
   };
+  localStorage.setItem(draftKey(rider, tanggal), JSON.stringify(draft));
+  setSyncStatus("Tersimpan di HP (belum dikirim ke Sheet)", "");
 }
-function adjustItemField(item, field, delta, rider, tanggal){
-  if(!rider || sessionClosed) return; // belum pilih rider / sudah ditutup hari ini
-  pushItemChange(Object.assign(itemPayloadBase(item, rider, tanggal), { action: "adjustItem", field, delta }));
+function loadDraft(rider, tanggal){
+  try{ return JSON.parse(localStorage.getItem(draftKey(rider, tanggal))); }
+  catch(e){ return null; }
 }
-function syncItemField(item, field, value, rider, tanggal){
-  if(!rider || sessionClosed) return;
-  pushItemChange(Object.assign(itemPayloadBase(item, rider, tanggal), { action: "setItemField", field, value }));
+function clearDraft(rider, tanggal){
+  localStorage.removeItem(draftKey(rider, tanggal));
 }
 
 // Muat ulang tally Stock Awal/Terjual/Modal/QRIS yang sudah tersimpan
@@ -573,26 +565,44 @@ async function loadSession(){
   const rider = $("riderInput").value.trim();
   const tanggal = $("tanggalInput").value;
   if(!rider || !tanggal) return;
+  let serverItems = {}, serverModal = 0, serverQris = 0, serverClosed = false;
   try{
     const res = await fetch(`${SCRIPT_URL}?action=getSession&rider=${encodeURIComponent(rider)}&tanggal=${encodeURIComponent(tanggal)}`);
     const data = await res.json();
-    if(data.status !== "ok") return;
-    document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
-      const info = data.items ? data.items[item.dataset.menu] : null;
-      const stockAwal = info && info.stockAwal ? info.stockAwal : 0;
-      item.querySelector(".stockAwal").value = stockAwal;
-      item.querySelector(".stockAwal-val").textContent = stockAwal;
-      item.querySelector(".terjual").value = info && info.terjual ? info.terjual : "";
-      item.querySelector(".terjual").dispatchEvent(new Event("input"));
-    });
-    $("modalInput").value = data.modal ? "Rp" + Number(data.modal).toLocaleString("id-ID") : "";
-    $("qrisInput").value = data.qris ? "Rp" + Number(data.qris).toLocaleString("id-ID") : "";
-    updateSetoranCash();
-    applyLockState(!!data.closed);
+    if(data.status === "ok"){
+      serverItems = data.items || {};
+      serverModal = data.modal || 0;
+      serverQris = data.qris || 0;
+      serverClosed = !!data.closed;
+    }
   }catch(e){
-    // offline/gagal muat sesi -> biarkan kosong, rider tetap bisa tap dari 0
-    applyLockState(false);
+    // offline -> tetap lanjut, pakai draft lokal kalau ada (di bawah)
   }
+
+  const draft = loadDraft(rider, tanggal);
+
+  document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
+    const menu = item.dataset.menu;
+    const info = serverItems[menu];
+    const stockAwal = info && info.stockAwal ? info.stockAwal : 0; // Stock Awal SELALU dari server (diisi Admin)
+    let terjual;
+    if(draft && draft.items && (menu in draft.items)) terjual = draft.items[menu];
+    else terjual = info && info.terjual ? info.terjual : 0;
+    item.querySelector(".stockAwal").value = stockAwal;
+    item.querySelector(".stockAwal-val").textContent = stockAwal;
+    item.querySelector(".terjual").value = terjual || "";
+    item.querySelector(".terjual").dispatchEvent(new Event("input"));
+  });
+
+  const modal = draft ? (draft.modal || 0) : serverModal;
+  const qris = draft ? (draft.qris || 0) : serverQris;
+  $("modalInput").value = modal ? "Rp" + Number(modal).toLocaleString("id-ID") : "";
+  $("qrisInput").value = qris ? "Rp" + Number(qris).toLocaleString("id-ID") : "";
+  updateSetoranCash();
+  // Ada draft lokal = sedang dalam proses input/edit yang belum dikirim -> jangan dikunci.
+  // Tidak ada draft = ikuti status server (sudah ditutup atau belum).
+  applyLockState(draft ? false : serverClosed);
+  if(draft) setSyncStatus("Tersimpan di HP (belum dikirim ke Sheet)", "");
 }
 
 // Format input angka jadi "Rp##.###" (titik ribuan, tanpa koma) saat diketik.
@@ -730,23 +740,19 @@ function renderEntryForm(){
       sisaVal.textContent = s - t;
       totalVal.textContent = formatRupiah(t * harga);
       updateGrandTotal();
+      if(!sessionClosed) saveDraft(sessionRider, sessionTanggal);
     }
-    const debouncedSyncTerjual = debounce(() => {
-      syncItemField(item, "terjual", parseFloat(terjualInput.value) || 0, sessionRider, sessionTanggal);
-    }, 700);
 
-    terjualInput.addEventListener("input", () => { recalcDisplay(); debouncedSyncTerjual(); });
+    terjualInput.addEventListener("input", recalcDisplay);
 
     item.querySelector(".step-btn.plus").addEventListener("click", () => {
       terjualInput.value = (parseFloat(terjualInput.value) || 0) + 1;
       recalcDisplay();
-      adjustItemField(item, "terjual", 1, sessionRider, sessionTanggal);
     });
     item.querySelector(".step-btn.minus").addEventListener("click", () => {
       const cur = parseFloat(terjualInput.value) || 0;
       terjualInput.value = Math.max(0, cur - 1);
       recalcDisplay();
-      adjustItemField(item, "terjual", -1, sessionRider, sessionTanggal);
     });
   });
   updateGrandTotal();
@@ -845,18 +851,6 @@ function updateSetoranCash(){
   el.classList.toggle("negative", setoran < 0);
 }
 
-// ---------- Antrean offline ----------
-const QUEUE_KEY = "penjualan_queue_v1";
-function getQueue(){ try{ return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; } catch(e){ return []; } }
-function saveQueue(q){ localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
-function refreshQueueNote(){
-  const q = getQueue();
-  $("queueNote").innerHTML = q.length
-    ? `<b>${q.length} kiriman</b> belum terkirim, akan dicoba ulang otomatis`
-    : "";
-}
-refreshQueueNote();
-
 async function sendToServer(payload){
   const res = await fetch(SCRIPT_URL, {
     method: "POST",
@@ -869,39 +863,7 @@ async function sendToServer(payload){
   return data;
 }
 
-const MAX_QUEUE_AGE_MS = 3 * 60 * 60 * 1000; // 3 jam -- lebih dari ini, berhenti dicoba, jangan diulang selamanya
-let flushInProgress = false; // cegah 2 flushQueue() jalan bersamaan (ini biang kerok bug dobel kirim)
-
-async function flushQueue(){
-  if(flushInProgress) return; // sudah ada yang jalan, jangan tumpuk
-  flushInProgress = true;
-  try{
-    let q = getQueue();
-    if(!q.length) { flushInProgress = false; return; }
-    const now = Date.now();
-    let expiredCount = 0;
-    const remaining = [];
-    for(const item of q){
-      if(item.queuedAt && (now - item.queuedAt) > MAX_QUEUE_AGE_MS){
-        expiredCount++; // sudah lebih dari 3 jam gagal terus, buang, jangan diulang selamanya
-        continue;
-      }
-      try{ await sendToServer(item); } catch(e){ remaining.push(item); }
-    }
-    saveQueue(remaining);
-    refreshQueueNote();
-    if(expiredCount > 0){
-      setSyncStatus(expiredCount + " perubahan gagal tersimpan >3 jam & dibatalkan — cek & input ulang manual kalau perlu", "err");
-    } else if(remaining.length === 0 && q.length > 0){
-      setSyncStatus("Tersimpan ✓", "ok");
-    }
-  } finally {
-    flushInProgress = false;
-  }
-}
-window.addEventListener("online", flushQueue);
-
-// ---------- Tutup Hari Ini (isi Modal/QRIS, tampilkan laporan) ----------
+// ---------- Tutup Hari Ini (kirim SEMUA data sekali jalan) ----------
 $("submitBtn").addEventListener("click", async () => {
   const rider = $("riderInput").value.trim();
   if(!rider){
@@ -909,18 +871,18 @@ $("submitBtn").addEventListener("click", async () => {
     $("statusMsg").className = "status err";
     return;
   }
-  // Kumpulkan item yang ada isinya, HANYA utk ditampilkan di halaman
-  // Report -- data Stock Awal/Terjual sendiri sudah tersimpan real-time
-  // sejak tadi (tiap tap +/- atau tiap ketik langsung), tidak dikirim
-  // ulang di sini.
+  const tanggal = $("tanggalInput").value;
   const items = [];
   document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
     const s = parseFloat(item.querySelector(".stockAwal").value) || 0;
     const t = parseFloat(item.querySelector(".terjual").value) || 0;
     if(s === 0 && t === 0) return;
     items.push({
-      menu: item.dataset.menu, satuan: item.dataset.satuan,
-      harga: parseFloat(item.dataset.harga) || 0, stockAwal: s, terjual: t
+      menu: item.dataset.menu, kategori: item.dataset.kategori,
+      subKategori: item.dataset.sub, satuan: item.dataset.satuan,
+      konversi: parseFloat(item.dataset.konversi) || 1,
+      harga: parseFloat(item.dataset.harga) || 0,
+      stockAwal: s, terjual: t
     });
   });
 
@@ -930,34 +892,36 @@ $("submitBtn").addEventListener("click", async () => {
   const komisiPlusOps = komisiTotalRp + operasionalValue;
   const setoranCash = grandTotalRp + modal - qris - komisiTotalRp - operasionalValue;
   const payload = {
-    action: "closeSession", rider, tanggal: $("tanggalInput").value,
+    action: "submitDay", requestId: generateRequestId(), rider, tanggal, items,
     totalPenjualan: grandTotalRp, totalKomisi: komisiTotalRp,
     modal, qris, operasional: operasionalValue, setoranCash
   };
   const reportSnapshot = {
-    rider, tanggal: $("tanggalInput").value, items,
+    rider, tanggal, items: items.map(it => ({ menu: it.menu, satuan: it.satuan, harga: it.harga, stockAwal: it.stockAwal, terjual: it.terjual })),
     rpMinuman: rpMinumanTotal, rpCookies: rpCookiesTotal, grandTotal: grandTotalRp,
     modal, qris, komisiPlusOps, setoranCash
   };
 
   $("submitBtn").disabled = true;
-  $("statusMsg").textContent = "Menyimpan...";
+  $("statusMsg").textContent = "Mengirim ke Sheet...";
   $("statusMsg").className = "status";
 
   try{
     await sendToServer(payload);
-    $("statusMsg").textContent = "Tersimpan ke Sheet Setoran ✓";
+    $("statusMsg").textContent = "Tersimpan ke Sheet ✓";
     $("statusMsg").className = "status ok";
+    clearDraft(rider, tanggal); // sudah terkirim, draft lokal tidak diperlukan lagi
     $("modalInput").value = "";
     $("qrisInput").value = "";
     applyLockState(true);
     renderReport(reportSnapshot);
   }catch(err){
-    // PENTING: JANGAN tampilkan halaman Report atau klaim berhasil di
-    // sini -- kalau ini terjadi, rider akan mengira data sudah masuk ke
-    // sheet Setoran padahal belum. Tampilkan gagal dengan jelas, minta
-    // coba lagi (aman diulang, tidak akan dobel).
-    $("statusMsg").textContent = "GAGAL menyimpan ke Sheet Setoran (" + (err.message || "cek koneksi") + "). Data Terjual kamu aman (sudah tersimpan otomatis), tapi Modal/QRIS/Setoran belum. Tekan tombol ini lagi kalau sinyal sudah oke.";
+    // PENTING: JANGAN tampilkan halaman Report atau klaim berhasil kalau
+    // gagal -- draft lokal TETAP DIBIARKAN supaya data tidak hilang, rider
+    // tinggal tekan tombol ini lagi setelah sinyal oke (aman diulang,
+    // karena ini kirim nilai PASTI/absolut, bukan +1/-1, jadi tidak akan
+    // dobel walau ditekan berkali-kali).
+    $("statusMsg").textContent = "GAGAL mengirim ke Sheet (" + (err.message || "cek koneksi") + "). Data kamu AMAN tersimpan di HP ini. Tekan tombol ini lagi kalau sinyal sudah oke.";
     $("statusMsg").className = "status err";
   }finally{
     $("submitBtn").disabled = false;
@@ -1105,8 +1069,7 @@ $("addMenuBtn").addEventListener("click", async () => {
 
 // ---------- Start ----------
 loadMenu();
-if(navigator.onLine) flushQueue();
-setInterval(() => { if(navigator.onLine && getQueue().length) flushQueue(); }, 20000);
+// Start: loadMenu() dipanggil di bawah
 if("serviceWorker" in navigator){
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").catch(()=>{});
