@@ -358,6 +358,7 @@
         <span class="label">Setoran Cash</span>
         <span class="val" id="setoranCashVal">Rp0</span>
       </div>
+      <p id="ambilKomisiNote" style="font-size:11.5px; color:var(--ink-soft); text-align:center; margin:8px 0 0;"></p>
     </div>
 
     <p class="locked-note" id="lockedNote" style="display:none;">
@@ -417,6 +418,8 @@
 
     <div class="report-card">
       <h2>Total Penjualan</h2>
+      <div class="report-row"><span>Jumlah Cup Minuman</span><span class="rp" id="reportJumlahCup">0</span></div>
+      <div class="report-row"><span>Jumlah Cookies</span><span class="rp" id="reportJumlahCookies">0</span></div>
       <div class="report-row"><span>Total Minuman</span><span class="rp" id="reportRpMinuman">Rp0</span></div>
       <div class="report-row"><span>Total Cookies</span><span class="rp" id="reportRpCookies">Rp0</span></div>
       <div class="report-row total"><span>Grand Total</span><span class="rp" id="reportGrandTotal">Rp0</span></div>
@@ -426,8 +429,9 @@
       <h2>Setoran</h2>
       <div class="report-row"><span>Modal (Kembalian)</span><span class="rp" id="reportModal">Rp0</span></div>
       <div class="report-row"><span>QRIS</span><span class="rp" id="reportQris">Rp0</span></div>
-      <div class="report-row"><span>Total Komisi + Operasional</span><span class="rp" id="reportKomisiOps">Rp0</span></div>
+      <div class="report-row"><span>Total Komisi + Insentif</span><span class="rp" id="reportKomisiOps">Rp0</span></div>
       <div class="report-row total grand"><span>Setoran Cash</span><span class="rp" id="reportSetoran">Rp0</span></div>
+      <p id="reportAmbilKomisiNote" style="font-size:11.5px; color:var(--ink-soft); text-align:center; margin:8px 0 0;"></p>
     </div>
 
     <button class="primary" id="backToEntryBtn">Input Data Baru</button>
@@ -438,14 +442,25 @@
 <script>
 // ================== KONFIGURASI ==================
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbys_3TssKzKvycmsQqI8MHg12aqUnFUpuTl8ZACXAyUrK5mnWNsaC1bmbMd1Tt8GhTl/exec";
-const APP_VERSION = "2026-07-27-lokal-final-v1"; // ganti tiap update, buat cek device mana yg belum update
+const APP_VERSION = "2026-08-01-insentif-v1"; // ganti tiap update, buat cek device mana yg belum update
 document.getElementById("appVersionLabel").textContent = APP_VERSION;
 // ==================================================
 
 const $ = (id) => document.getElementById(id);
 let menuData = [];
 let aturanData = {};
-let operasionalValue = 10000;
+let operasionalValue = 10000; // fallback/default global kalau rider belum ada settingnya sendiri
+let riderOperasionalMap = {}; // {"Pak Jay": 10000, "Mas Restu": 15000, ...}
+function currentOperasional(){
+  const rider = $("riderInput").value.trim();
+  const val = riderOperasionalMap[rider];
+  return (val || val === 0) ? val : operasionalValue;
+}
+let riderAmbilKomisiMap = {}; // {"Pak Jay":"Harian", "Mas Restu":"Bulanan", ...}
+function currentAmbilKomisi(){
+  const rider = $("riderInput").value.trim();
+  return riderAmbilKomisiMap[rider] === "Bulanan" ? "Bulanan" : "Harian";
+}
 let grandTotalRp = 0;
 let rpMinumanTotal = 0;
 let rpCookiesTotal = 0;
@@ -625,6 +640,8 @@ async function loadMenu(){
     menuData = data.menu || [];
     aturanData = data.aturan || {};
     operasionalValue = data.operasional || 0;
+    riderAmbilKomisiMap = data.riderAmbilKomisi || {};
+    riderOperasionalMap = data.riderOperasional || {};
 
     const savedRider = localStorage.getItem("nama_rider") || "";
     const select = $("riderInput");
@@ -635,16 +652,22 @@ async function loadMenu(){
     localStorage.setItem("menu_cache", JSON.stringify(menuData));
     localStorage.setItem("aturan_cache", JSON.stringify(aturanData));
     localStorage.setItem("operasional_cache", JSON.stringify(operasionalValue));
+    localStorage.setItem("riderAmbilKomisi_cache", JSON.stringify(riderAmbilKomisiMap));
+    localStorage.setItem("riderOperasional_cache", JSON.stringify(riderOperasionalMap));
   }catch(e){
     // fallback: pakai cache lokal kalau offline
     const cachedMenu = localStorage.getItem("menu_cache");
     const cachedAturan = localStorage.getItem("aturan_cache");
     const cachedOperasional = localStorage.getItem("operasional_cache");
+    const cachedRiderAmbilKomisi = localStorage.getItem("riderAmbilKomisi_cache");
+    const cachedRiderOperasional = localStorage.getItem("riderOperasional_cache");
     if(cachedMenu) menuData = JSON.parse(cachedMenu);
     if(cachedAturan) aturanData = JSON.parse(cachedAturan);
     if(cachedOperasional){
       operasionalValue = JSON.parse(cachedOperasional);
     }
+    if(cachedRiderOperasional) riderOperasionalMap = JSON.parse(cachedRiderOperasional);
+    if(cachedRiderAmbilKomisi) riderAmbilKomisiMap = JSON.parse(cachedRiderAmbilKomisi);
   }
   renderEntryForm();
   renderKomisiCard();
@@ -831,12 +854,12 @@ function renderKomisiCard(cupMinuman, cupCookies){
       <span class="val">${formatRupiah(totalKomisi)}</span>
     </div>
     <div class="komisi-row" style="padding-top:2px;">
-      <span>Biaya Operasional</span>
-      <span class="rp">${formatRupiah(operasionalValue)}</span>
+      <span>Insentif Harian (Operasional)</span>
+      <span class="rp">${formatRupiah(currentOperasional())}</span>
     </div>
     <div class="komisi-estimate">
-      <span class="label">Total Komisi + Operasional</span>
-      <span class="val">${formatRupiah(totalKomisi + operasionalValue)}</span>
+      <span class="label">Total Komisi + Insentif</span>
+      <span class="val">${formatRupiah(totalKomisi + currentOperasional())}</span>
     </div>`;
   card.innerHTML = html;
   updateSetoranCash();
@@ -845,10 +868,18 @@ function renderKomisiCard(cupMinuman, cupCookies){
 function updateSetoranCash(){
   const modal = parseRupiahInput($("modalInput"));
   const qris = parseRupiahInput($("qrisInput"));
-  const setoran = grandTotalRp + modal - qris - komisiTotalRp - operasionalValue;
+  const ambilKomisi = currentAmbilKomisi();
+  const komisiDikurangi = ambilKomisi === "Harian" ? komisiTotalRp : 0;
+  const setoran = grandTotalRp + modal - qris - currentOperasional() - komisiDikurangi;
   const el = $("setoranCashVal");
   el.textContent = formatRupiah(setoran);
   el.classList.toggle("negative", setoran < 0);
+  const note = $("ambilKomisiNote");
+  if(note){
+    note.textContent = ambilKomisi === "Harian"
+      ? "Komisi diambil harian — sudah dikurangi dari Setoran Cash di atas."
+      : "Komisi diambil bulanan — TIDAK dikurangi hari ini, akan diakumulasi & dibayar terpisah.";
+  }
 }
 
 async function sendToServer(payload){
@@ -889,17 +920,9 @@ $("submitBtn").addEventListener("click", async () => {
   localStorage.setItem("nama_rider", rider);
   const modal = parseRupiahInput($("modalInput"));
   const qris = parseRupiahInput($("qrisInput"));
-  const komisiPlusOps = komisiTotalRp + operasionalValue;
-  const setoranCash = grandTotalRp + modal - qris - komisiTotalRp - operasionalValue;
   const payload = {
     action: "submitDay", requestId: generateRequestId(), rider, tanggal, items,
-    totalPenjualan: grandTotalRp, totalKomisi: komisiTotalRp,
-    modal, qris, operasional: operasionalValue, setoranCash
-  };
-  const reportSnapshot = {
-    rider, tanggal, items: items.map(it => ({ menu: it.menu, satuan: it.satuan, harga: it.harga, stockAwal: it.stockAwal, terjual: it.terjual })),
-    rpMinuman: rpMinumanTotal, rpCookies: rpCookiesTotal, grandTotal: grandTotalRp,
-    modal, qris, komisiPlusOps, setoranCash
+    modal, qris
   };
 
   $("submitBtn").disabled = true;
@@ -907,13 +930,25 @@ $("submitBtn").addEventListener("click", async () => {
   $("statusMsg").className = "status";
 
   try{
-    await sendToServer(payload);
+    const result = await sendToServer(payload);
     $("statusMsg").textContent = "Tersimpan ke Sheet ✓";
     $("statusMsg").className = "status ok";
     clearDraft(rider, tanggal); // sudah terkirim, draft lokal tidak diperlukan lagi
     $("modalInput").value = "";
     $("qrisInput").value = "";
     applyLockState(true);
+    // Pakai angka OTORITATIF dari server (bukan hitungan client) utk laporan,
+    // supaya selalu konsisten dengan yang benar-benar tersimpan di Sheet.
+    const reportSnapshot = {
+      rider, tanggal,
+      items: items.map(it => ({ menu: it.menu, satuan: it.satuan, harga: it.harga, stockAwal: it.stockAwal, terjual: it.terjual })),
+      rpMinuman: rpMinumanTotal, rpCookies: rpCookiesTotal, grandTotal: result.totalPenjualan,
+      modal, qris,
+      komisiPlusOps: result.totalKomisi + result.operasional,
+      setoranCash: result.setoranCash,
+      jumlahCup: result.cupMinuman, jumlahCookies: result.pcsCookies,
+      ambilKomisi: result.ambilKomisi
+    };
     renderReport(reportSnapshot);
   }catch(err){
     // PENTING: JANGAN tampilkan halaman Report atau klaim berhasil kalau
@@ -1020,6 +1055,8 @@ function renderReport(snapshot){
       </div>`;
   }).join("");
 
+  $("reportJumlahCup").textContent = snapshot.jumlahCup || 0;
+  $("reportJumlahCookies").textContent = snapshot.jumlahCookies || 0;
   $("reportRpMinuman").textContent = formatRupiah(snapshot.rpMinuman);
   $("reportRpCookies").textContent = formatRupiah(snapshot.rpCookies);
   $("reportGrandTotal").textContent = formatRupiah(snapshot.grandTotal);
@@ -1028,6 +1065,12 @@ function renderReport(snapshot){
   $("reportQris").textContent = formatRupiah(snapshot.qris);
   $("reportKomisiOps").textContent = formatRupiah(snapshot.komisiPlusOps);
   $("reportSetoran").textContent = formatRupiah(snapshot.setoranCash);
+  const noteEl = $("reportAmbilKomisiNote");
+  if(noteEl){
+    noteEl.textContent = snapshot.ambilKomisi === "Bulanan"
+      ? "Komisi diambil bulanan — tidak dikurangi hari ini, diakumulasi & dibayar terpisah."
+      : "Komisi diambil harian — sudah dikurangi dari Setoran Cash di atas.";
+  }
 
   showScreen("reportScreen");
 }
