@@ -301,6 +301,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-screen="entryScreen">Input Data</button>
     <button class="tab-btn" data-screen="menuScreen">Kelola Menu</button>
+    <button class="tab-btn" data-screen="ownerPanelScreen">Panel Owner</button>
   </div>
 </header>
 
@@ -319,55 +320,64 @@
       <input type="hidden" id="tanggalInput">
     </div>
 
-    <p class="sync-status" id="syncStatus" style="text-align:center; margin:0 0 12px;">
-      Tap +/− tersimpan di HP dulu — tekan "Tutup Hari Ini" utk kirim ke Sheet
-    </p>
-
-    <div class="card" id="menuListCard">
-      <!-- diisi otomatis lewat JS dari daftar menu -->
+    <div class="card" id="riderPasswordGateCard" style="display:none;">
+      <label for="riderPasswordInput">Password (tanya Owner kalau lupa)</label>
+      <input type="password" id="riderPasswordInput" placeholder="Password kamu" inputmode="numeric">
+      <button class="primary" id="riderPasswordSubmitBtn" style="margin-top:10px;">Masuk</button>
+      <p class="status" id="riderPasswordStatusMsg"></p>
     </div>
 
-    <div class="receipt">
-      <h2>Ringkasan</h2>
-      <div class="receipt-line">
-        <span>Total Minuman</span>
-        <span class="val"><span id="totalCupMinuman">0</span> cup · <span id="totalRpMinuman">Rp0</span></span>
-      </div>
-      <div class="receipt-line">
-        <span>Total Cookies</span>
-        <span class="val"><span id="totalPcsCookies">0</span> pcs · <span id="totalRpCookies">Rp0</span></span>
-      </div>
-      <div class="receipt-line total"><span>Grand Total</span><span class="val" id="totalRp">Rp0</span></div>
-    </div>
+    <div id="entryContentWrap" style="display:none;">
+      <p class="sync-status" id="syncStatus" style="text-align:center; margin:0 0 12px;">
+        Tap +/− tersimpan di HP dulu — tekan "Tutup Hari Ini" utk kirim ke Sheet
+      </p>
 
-    <div class="komisi-card" id="komisiCard">
-      <!-- diisi otomatis lewat JS dari sheet Aturan -->
-    </div>
+      <div class="card" id="menuListCard">
+        <!-- diisi otomatis lewat JS dari daftar menu -->
+      </div>
 
-    <div class="setoran-card">
-      <h2>Setoran</h2>
-      <div class="setoran-row">
-        <span>Modal (Kembalian)</span>
-        <input type="text" id="modalInput" inputmode="numeric" placeholder="Rp0">
+      <div class="receipt">
+        <h2>Ringkasan</h2>
+        <div class="receipt-line">
+          <span>Total Minuman</span>
+          <span class="val"><span id="totalCupMinuman">0</span> cup · <span id="totalRpMinuman">Rp0</span></span>
+        </div>
+        <div class="receipt-line">
+          <span>Total Cookies</span>
+          <span class="val"><span id="totalPcsCookies">0</span> pcs · <span id="totalRpCookies">Rp0</span></span>
+        </div>
+        <div class="receipt-line total"><span>Grand Total</span><span class="val" id="totalRp">Rp0</span></div>
       </div>
-      <div class="setoran-row">
-        <span>QRIS</span>
-        <input type="text" id="qrisInput" inputmode="numeric" placeholder="Rp0">
-      </div>
-      <div class="setoran-result">
-        <span class="label">Setoran Cash</span>
-        <span class="val" id="setoranCashVal">Rp0</span>
-      </div>
-      <p id="ambilKomisiNote" style="font-size:11.5px; color:var(--ink-soft); text-align:center; margin:8px 0 0;"></p>
-    </div>
 
-    <p class="locked-note" id="lockedNote" style="display:none;">
-      ✓ Hari ini sudah ditutup. Data Terjual tidak bisa diubah lagi
-      lewat tap/ketik langsung, kecuali tekan "Edit Data" dulu.
-    </p>
-    <button class="primary" id="submitBtn">Tutup Hari Ini</button>
-    <button class="secondary" id="editDataBtn" style="display:none;">Edit Data Hari Ini</button>
-    <p class="status" id="statusMsg"></p>
+      <div class="komisi-card" id="komisiCard">
+        <!-- diisi otomatis lewat JS dari sheet Aturan -->
+      </div>
+
+      <div class="setoran-card">
+        <h2>Setoran</h2>
+        <div class="setoran-row">
+          <span>Modal (Kembalian)</span>
+          <input type="text" id="modalInput" inputmode="numeric" placeholder="Rp0">
+        </div>
+        <div class="setoran-row">
+          <span>QRIS</span>
+          <input type="text" id="qrisInput" inputmode="numeric" placeholder="Rp0">
+        </div>
+        <div class="setoran-result">
+          <span class="label">Setoran Cash</span>
+          <span class="val" id="setoranCashVal">Rp0</span>
+        </div>
+        <p id="ambilKomisiNote" style="font-size:11.5px; color:var(--ink-soft); text-align:center; margin:8px 0 0;"></p>
+      </div>
+
+      <p class="locked-note" id="lockedNote" style="display:none;">
+        ✓ Hari ini sudah ditutup. Data Terjual tidak bisa diubah lagi
+        lewat tap/ketik langsung, kecuali tekan "Edit Data" dulu.
+      </p>
+      <button class="primary" id="submitBtn">Tutup Hari Ini</button>
+      <button class="secondary" id="editDataBtn" style="display:none;">Edit Data Hari Ini</button>
+      <p class="status" id="statusMsg"></p>
+    </div>
   </section>
 
   <!-- ===================== SCREEN: KELOLA MENU ===================== -->
@@ -403,6 +413,56 @@
     </p>
   </section>
 
+  <!-- ===================== SCREEN: PANEL OWNER ===================== -->
+  <section class="screen" id="ownerPanelScreen">
+    <div class="card" id="ownerPinGateCard">
+      <p class="form-section-title" style="margin-top:0">🔒 Panel Owner</p>
+      <p style="font-size:12px; color:var(--ink-soft); margin:0 0 10px;">Khusus Owner. Masukkan PIN (sheet Aturan, sel B9).</p>
+      <input type="password" id="ownerPinInput" inputmode="numeric" placeholder="PIN Owner" maxlength="12">
+      <button class="primary" id="ownerPinSubmitBtn" style="margin-top:10px;">Masuk</button>
+      <p class="status" id="ownerPinStatusMsg"></p>
+    </div>
+
+    <div id="ownerPanelContentWrap" style="display:none;">
+      <!-- ---- Kelola Password Rider ---- -->
+      <div class="card">
+        <p class="form-section-title" style="margin-top:0">Kelola Password Rider</p>
+        <p style="font-size:11.5px; color:var(--ink-soft); margin:0 0 10px;">Password ini yang rider ketik sebelum bisa input di tab "Input Data".</p>
+        <div id="ownerPasswordListCard"></div>
+        <p class="status" id="ownerPasswordStatusMsg"></p>
+      </div>
+
+      <!-- ---- Input/Edit Backdate ---- -->
+      <div class="card">
+        <p class="form-section-title" style="margin-top:0">Input / Edit Backdate</p>
+        <p style="font-size:11.5px; color:var(--ink-soft); margin:0 0 10px;">Input data penjualan atas nama rider mana pun, tanggal bebas (termasuk tanggal lalu), tanpa perlu password rider.</p>
+        <label for="ownerBackdateRider">Nama Rider</label>
+        <select id="ownerBackdateRider"><option value="">— Pilih Rider —</option></select>
+        <label for="ownerBackdateTanggal">Tanggal</label>
+        <input type="date" id="ownerBackdateTanggal">
+        <button class="secondary" id="ownerBackdateMuatBtn" style="margin-top:10px;">Muat Data</button>
+        <p class="status" id="ownerBackdateStatusMsg"></p>
+      </div>
+
+      <div id="ownerBackdateFormWrap" style="display:none;">
+        <div class="card" id="ownerBackdateMenuCard"></div>
+        <div class="setoran-card">
+          <h2>Setoran</h2>
+          <div class="setoran-row">
+            <span>Modal (Kembalian)</span>
+            <input type="text" id="ownerBackdateModal" inputmode="numeric" placeholder="Rp0">
+          </div>
+          <div class="setoran-row">
+            <span>QRIS</span>
+            <input type="text" id="ownerBackdateQris" inputmode="numeric" placeholder="Rp0">
+          </div>
+        </div>
+        <button class="primary" id="ownerBackdateSubmitBtn" style="margin-top:12px;">Simpan Data Backdate</button>
+        <p class="status" id="ownerBackdateSubmitStatusMsg"></p>
+      </div>
+    </div>
+  </section>
+
   <!-- ===================== SCREEN: REPORT ===================== -->
   <section class="screen" id="reportScreen">
     <div class="report-header">
@@ -420,6 +480,8 @@
       <h2>Total Penjualan</h2>
       <div class="report-row"><span>Jumlah Cup Minuman</span><span class="rp" id="reportJumlahCup">0</span></div>
       <div class="report-row"><span>Jumlah Cookies</span><span class="rp" id="reportJumlahCookies">0</span></div>
+      <div class="report-row"><span>Sisa Minuman (belum terjual)</span><span class="rp" id="reportSisaCup">0 cup</span></div>
+      <div class="report-row"><span>Sisa Cookies (belum terjual)</span><span class="rp" id="reportSisaCookies">0 pcs</span></div>
       <div class="report-row"><span>Total Minuman</span><span class="rp" id="reportRpMinuman">Rp0</span></div>
       <div class="report-row"><span>Total Cookies</span><span class="rp" id="reportRpCookies">Rp0</span></div>
       <div class="report-row total"><span>Grand Total</span><span class="rp" id="reportGrandTotal">Rp0</span></div>
@@ -442,7 +504,7 @@
 <script>
 // ================== KONFIGURASI ==================
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbys_3TssKzKvycmsQqI8MHg12aqUnFUpuTl8ZACXAyUrK5mnWNsaC1bmbMd1Tt8GhTl/exec";
-const APP_VERSION = "2026-08-01-insentif-v1"; // ganti tiap update, buat cek device mana yg belum update
+const APP_VERSION = "2026-09-25-ownerpanel-v3"; // ganti tiap update, buat cek device mana yg belum update
 document.getElementById("appVersionLabel").textContent = APP_VERSION;
 // ==================================================
 
@@ -457,6 +519,7 @@ function currentOperasional(){
   return (val || val === 0) ? val : operasionalValue;
 }
 let riderAmbilKomisiMap = {}; // {"Pak Jay":"Harian", "Mas Restu":"Bulanan", ...}
+let daftarRiderGlobal = []; // dipakai ulang utk dropdown rider di Panel Owner
 function currentAmbilKomisi(){
   const rider = $("riderInput").value.trim();
   return riderAmbilKomisiMap[rider] === "Bulanan" ? "Bulanan" : "Harian";
@@ -495,6 +558,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     showScreen(btn.dataset.screen);
     if(btn.dataset.screen === "menuScreen") renderMenuManage();
+    if(btn.dataset.screen === "ownerPanelScreen") initOwnerPanelScreen();
   });
 });
 
@@ -511,12 +575,249 @@ function setTanggalHariIni(){
   $("tanggalDisplay").textContent = today.toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
 }
 setTanggalHariIni();
-$("riderInput").addEventListener("change", () => {
-  localStorage.setItem("nama_rider", $("riderInput").value);
+let riderTerverifikasiSesiIni = new Set(); // nama rider yg sudah lolos password sesi ini (tidak persist, hilang kalau app ditutup)
+function tampilkanKontenSetelahVerifikasi(){
+  $("riderPasswordGateCard").style.display = "none";
+  $("entryContentWrap").style.display = "block";
   setTanggalHariIni(); // jaga-jaga kalau app dibiarkan terbuka lewat tengah malam
   renderEntryForm();
   loadSession();
+}
+$("riderInput").addEventListener("change", () => {
+  const rider = $("riderInput").value;
+  localStorage.setItem("nama_rider", rider);
+  if(!rider){
+    $("riderPasswordGateCard").style.display = "none";
+    $("entryContentWrap").style.display = "none";
+    return;
+  }
+  if(riderTerverifikasiSesiIni.has(rider)){
+    tampilkanKontenSetelahVerifikasi();
+  } else {
+    $("entryContentWrap").style.display = "none";
+    $("riderPasswordGateCard").style.display = "block";
+    $("riderPasswordInput").value = "";
+    $("riderPasswordStatusMsg").textContent = "";
+    $("riderPasswordInput").focus();
+  }
 });
+$("riderPasswordSubmitBtn").addEventListener("click", async () => {
+  const rider = $("riderInput").value;
+  const password = $("riderPasswordInput").value;
+  if(!rider || !password){
+    $("riderPasswordStatusMsg").textContent = "Password wajib diisi";
+    $("riderPasswordStatusMsg").className = "status err";
+    return;
+  }
+  $("riderPasswordSubmitBtn").disabled = true;
+  $("riderPasswordStatusMsg").textContent = "Memeriksa...";
+  $("riderPasswordStatusMsg").className = "status";
+  try{
+    await sendToServer({ action: "verifyRiderPassword", rider, password });
+    riderTerverifikasiSesiIni.add(rider);
+    tampilkanKontenSetelahVerifikasi();
+  }catch(err){
+    $("riderPasswordStatusMsg").textContent = err.message || "Password salah";
+    $("riderPasswordStatusMsg").className = "status err";
+  }finally{
+    $("riderPasswordSubmitBtn").disabled = false;
+  }
+});
+$("riderPasswordInput").addEventListener("keydown", (e) => {
+  if(e.key === "Enter") $("riderPasswordSubmitBtn").click();
+});
+
+// ---------- Panel Owner ----------
+let ownerPanelVerified = false;
+let ownerPin = "";
+let ownerBackdateExistingId = null; // kalau ada data existing yg lagi diedit, ID-nya disimpan di sini
+
+function initOwnerPanelScreen(){
+  if(ownerPanelVerified){
+    $("ownerPinGateCard").style.display = "none";
+    $("ownerPanelContentWrap").style.display = "block";
+    muatOwnerPanelData();
+  } else {
+    $("ownerPinGateCard").style.display = "block";
+    $("ownerPanelContentWrap").style.display = "none";
+    $("ownerPinInput").value = "";
+    $("ownerPinStatusMsg").textContent = "";
+  }
+}
+$("ownerPinSubmitBtn").addEventListener("click", async () => {
+  const pin = $("ownerPinInput").value.trim();
+  if(!pin){
+    $("ownerPinStatusMsg").textContent = "PIN wajib diisi";
+    $("ownerPinStatusMsg").className = "status err";
+    return;
+  }
+  $("ownerPinSubmitBtn").disabled = true;
+  $("ownerPinStatusMsg").textContent = "Memeriksa...";
+  $("ownerPinStatusMsg").className = "status";
+  try{
+    await sendToServer({ action: "verifyPin", pin });
+    ownerPanelVerified = true;
+    ownerPin = pin; // disimpan di memori sesi ini, dipakai ulang utk setRiderPassword & updateSubmission
+    $("ownerPinGateCard").style.display = "none";
+    $("ownerPanelContentWrap").style.display = "block";
+    muatOwnerPanelData();
+  }catch(err){
+    $("ownerPinStatusMsg").textContent = err.message || "PIN salah";
+    $("ownerPinStatusMsg").className = "status err";
+  }finally{
+    $("ownerPinSubmitBtn").disabled = false;
+  }
+});
+$("ownerPinInput").addEventListener("keydown", (e) => { if(e.key === "Enter") $("ownerPinSubmitBtn").click(); });
+
+async function muatOwnerPanelData(){
+  const optsHtml = '<option value="">— Pilih Rider —</option>' + daftarRiderGlobal.map(r => `<option value="${r}">${r}</option>`).join("");
+  $("ownerBackdateRider").innerHTML = optsHtml;
+  if(!$("ownerBackdateTanggal").value) $("ownerBackdateTanggal").value = localDateStr(new Date());
+
+  const card = $("ownerPasswordListCard");
+  card.innerHTML = '<p class="empty-note">Memuat...</p>';
+  try{
+    const res = await fetch(SCRIPT_URL + "?action=getDaftarKaryawan");
+    const data = await res.json();
+    const karyawan = data.karyawan || [];
+    card.innerHTML = karyawan.map(k => `
+      <div class="menu-manage-item" data-rider="${k.rider}">
+        <div class="menu-manage-name">${k.rider} ${k.passwordSudahDiset ? '<span style="color:#1F6F50; font-size:11px;">(sudah diset)</span>' : '<span style="color:#B4432E; font-size:11px;">(belum diset)</span>'}</div>
+        <input type="text" class="ownerPasswordInput" placeholder="Password baru" style="margin-top:6px;">
+        <button class="secondary ownerPasswordSaveBtn" style="margin-top:6px; width:100%;">Simpan Password</button>
+      </div>
+    `).join("");
+    card.querySelectorAll(".ownerPasswordSaveBtn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const wrap = btn.closest(".menu-manage-item");
+        const rider = wrap.dataset.rider;
+        const password = wrap.querySelector(".ownerPasswordInput").value.trim();
+        if(!password) return;
+        btn.disabled = true;
+        $("ownerPasswordStatusMsg").textContent = "Menyimpan...";
+        $("ownerPasswordStatusMsg").className = "status";
+        try{
+          await sendToServer({ action: "setRiderPassword", pin: ownerPin, rider, password });
+          $("ownerPasswordStatusMsg").textContent = `Password ${rider} tersimpan ✓`;
+          $("ownerPasswordStatusMsg").className = "status ok";
+          muatOwnerPanelData();
+        }catch(err){
+          $("ownerPasswordStatusMsg").textContent = "Gagal: " + err.message;
+          $("ownerPasswordStatusMsg").className = "status err";
+          btn.disabled = false;
+        }
+      });
+    });
+  }catch(e){
+    card.innerHTML = '<p class="status err">Gagal memuat daftar rider.</p>';
+  }
+}
+
+$("ownerBackdateMuatBtn").addEventListener("click", async () => {
+  const rider = $("ownerBackdateRider").value;
+  const tanggal = $("ownerBackdateTanggal").value;
+  if(!rider || !tanggal){
+    $("ownerBackdateStatusMsg").textContent = "Pilih rider & tanggal dulu";
+    $("ownerBackdateStatusMsg").className = "status err";
+    return;
+  }
+  $("ownerBackdateStatusMsg").textContent = "Memuat...";
+  $("ownerBackdateStatusMsg").className = "status";
+  const id = rider + "|" + tanggal;
+  try{
+    const res = await fetch(SCRIPT_URL + "?action=getSubmission&id=" + encodeURIComponent(id));
+    const data = await res.json();
+    if(data.status === "ok"){
+      ownerBackdateExistingId = id;
+      renderOwnerBackdateForm(data.items, data.modal, data.qris);
+      $("ownerBackdateStatusMsg").textContent = "Data existing dimuat, siap diedit.";
+      $("ownerBackdateStatusMsg").className = "status ok";
+    } else {
+      throw new Error(data.message);
+    }
+  }catch(e){
+    // Tidak ada data existing utk rider+tanggal ini -> mulai kosong (input baru)
+    ownerBackdateExistingId = null;
+    renderOwnerBackdateForm([], 0, 0);
+    $("ownerBackdateStatusMsg").textContent = "Belum ada data utk rider+tanggal ini, silakan input baru.";
+    $("ownerBackdateStatusMsg").className = "status";
+  }
+});
+
+function renderOwnerBackdateForm(existingItems, modal, qris){
+  const existingByMenu = {};
+  existingItems.forEach(it => existingByMenu[it.menu] = it);
+
+  let html = "";
+  SUBKATEGORI_ORDER.forEach(sub => {
+    const items = sub === "Cookies"
+      ? menuData.filter(m => m.kategori === "Cookies")
+      : menuData.filter(m => m.kategori === "Minuman" && m.subKategori === sub);
+    if(!items.length) return;
+    html += `<p class="form-section-title">${SUBKATEGORI_LABEL[sub]}</p>`;
+    items.forEach(m => {
+      const satuan = m.satuan || (m.kategori === "Cookies" ? "pcs" : "cup");
+      const existing = existingByMenu[m.menu];
+      const stockAwal = existing ? existing.stockAwal : "";
+      const terjual = existing ? existing.terjual : "";
+      html += `
+        <div class="menu-item" data-menu="${m.menu}" data-kategori="${m.kategori}" data-sub="${m.subKategori || ''}" data-satuan="${satuan}" data-konversi="${m.konversi || 1}" data-harga="${m.harga}">
+          <div class="menu-item-name">${m.menu}</div>
+          <div class="menu-item-harga">${formatRupiah(m.harga)} / ${satuan}</div>
+          <div class="row2">
+            <div><label style="font-size:11px;">Stock Awal</label><input type="number" class="stockAwal" value="${stockAwal}" placeholder="0"></div>
+            <div><label style="font-size:11px;">Terjual</label><input type="number" class="terjual" value="${terjual}" placeholder="0"></div>
+          </div>
+        </div>`;
+    });
+  });
+  $("ownerBackdateMenuCard").innerHTML = html;
+  $("ownerBackdateModal").value = modal ? "Rp" + Number(modal).toLocaleString("id-ID") : "";
+  $("ownerBackdateQris").value = qris ? "Rp" + Number(qris).toLocaleString("id-ID") : "";
+  $("ownerBackdateFormWrap").style.display = "block";
+}
+attachRupiahInput($("ownerBackdateModal"));
+attachRupiahInput($("ownerBackdateQris"));
+
+$("ownerBackdateSubmitBtn").addEventListener("click", async () => {
+  const rider = $("ownerBackdateRider").value;
+  const tanggal = $("ownerBackdateTanggal").value;
+  const items = [];
+  document.querySelectorAll("#ownerBackdateMenuCard .menu-item").forEach(item => {
+    const s = parseFloat(item.querySelector(".stockAwal").value) || 0;
+    const t = parseFloat(item.querySelector(".terjual").value) || 0;
+    if(s === 0 && t === 0) return;
+    items.push({
+      menu: item.dataset.menu, kategori: item.dataset.kategori,
+      subKategori: item.dataset.sub, satuan: item.dataset.satuan,
+      konversi: parseFloat(item.dataset.konversi) || 1,
+      harga: parseFloat(item.dataset.harga) || 0,
+      stockAwal: s, terjual: t
+    });
+  });
+  const modal = parseRupiahInput($("ownerBackdateModal"));
+  const qris = parseRupiahInput($("ownerBackdateQris"));
+
+  $("ownerBackdateSubmitBtn").disabled = true;
+  $("ownerBackdateSubmitStatusMsg").textContent = "Menyimpan...";
+  $("ownerBackdateSubmitStatusMsg").className = "status";
+  try{
+    if(ownerBackdateExistingId){
+      await sendToServer({ action: "updateSubmission", pin: ownerPin, submissionId: ownerBackdateExistingId, rider, tanggal, items, modal, qris });
+    } else {
+      await sendToServer({ action: "submitDay", requestId: generateRequestId(), rider, tanggal, items, modal, qris });
+    }
+    $("ownerBackdateSubmitStatusMsg").textContent = "Tersimpan ✓";
+    $("ownerBackdateSubmitStatusMsg").className = "status ok";
+  }catch(err){
+    $("ownerBackdateSubmitStatusMsg").textContent = "Gagal: " + err.message;
+    $("ownerBackdateSubmitStatusMsg").className = "status err";
+  }finally{
+    $("ownerBackdateSubmitBtn").disabled = false;
+  }
+});
+
 $("modalInput").addEventListener("input", () => {
   updateSetoranCash();
   if(!sessionClosed) saveDraft($("riderInput").value.trim(), $("tanggalInput").value);
@@ -645,8 +946,9 @@ async function loadMenu(){
 
     const savedRider = localStorage.getItem("nama_rider") || "";
     const select = $("riderInput");
+    daftarRiderGlobal = data.riders || [];
     select.innerHTML = '<option value="">— Pilih Rider —</option>' +
-      (data.riders || []).map(r => `<option value="${r}">${r}</option>`).join("");
+      daftarRiderGlobal.map(r => `<option value="${r}">${r}</option>`).join("");
     if(savedRider) select.value = savedRider;
 
     localStorage.setItem("menu_cache", JSON.stringify(menuData));
@@ -669,9 +971,14 @@ async function loadMenu(){
     if(cachedRiderOperasional) riderOperasionalMap = JSON.parse(cachedRiderOperasional);
     if(cachedRiderAmbilKomisi) riderAmbilKomisiMap = JSON.parse(cachedRiderAmbilKomisi);
   }
-  renderEntryForm();
-  renderKomisiCard();
-  loadSession();
+  // Rider tersimpan dari sesi sebelumnya TETAP harus lewat gerbang password lagi
+  // (verifikasi tidak persist antar buka-app, sama spt PIN Owner) -- jangan
+  // langsung tampilkan konten input begitu saja.
+  const riderDipilih = $("riderInput").value;
+  if(riderDipilih){
+    $("entryContentWrap").style.display = "none";
+    $("riderPasswordGateCard").style.display = "block";
+  }
 }
 
 const SUBKATEGORI_ORDER = ["Cup", "500 ml", "1 Liter", "Cookies"];
@@ -941,7 +1248,7 @@ $("submitBtn").addEventListener("click", async () => {
     // supaya selalu konsisten dengan yang benar-benar tersimpan di Sheet.
     const reportSnapshot = {
       rider, tanggal,
-      items: items.map(it => ({ menu: it.menu, satuan: it.satuan, harga: it.harga, stockAwal: it.stockAwal, terjual: it.terjual })),
+      items: items.map(it => ({ menu: it.menu, kategori: it.kategori, satuan: it.satuan, harga: it.harga, konversi: it.konversi, stockAwal: it.stockAwal, terjual: it.terjual })),
       rpMinuman: rpMinumanTotal, rpCookies: rpCookiesTotal, grandTotal: result.totalPenjualan,
       modal, qris,
       komisiPlusOps: result.totalKomisi + result.operasional,
@@ -1057,6 +1364,18 @@ function renderReport(snapshot){
 
   $("reportJumlahCup").textContent = snapshot.jumlahCup || 0;
   $("reportJumlahCookies").textContent = snapshot.jumlahCookies || 0;
+
+  // Total sisa (belum terjual) -- Minuman dihitung setara cup (pakai
+  // konversi, sama spt Jumlah Cup di atas), Cookies apa adanya per pcs.
+  let totalSisaCup = 0, totalSisaCookies = 0;
+  snapshot.items.forEach(item => {
+    const sisa = item.stockAwal - item.terjual;
+    if(item.kategori === "Minuman") totalSisaCup += sisa * (item.konversi || 1);
+    else if(item.kategori === "Cookies") totalSisaCookies += sisa;
+  });
+  $("reportSisaCup").textContent = totalSisaCup + " cup";
+  $("reportSisaCookies").textContent = totalSisaCookies + " pcs";
+
   $("reportRpMinuman").textContent = formatRupiah(snapshot.rpMinuman);
   $("reportRpCookies").textContent = formatRupiah(snapshot.rpCookies);
   $("reportGrandTotal").textContent = formatRupiah(snapshot.grandTotal);
@@ -1116,6 +1435,14 @@ loadMenu();
 if("serviceWorker" in navigator){
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").catch(()=>{});
+  });
+  // Auto-reload SEKALI saat service worker baru ambil alih (abis update) --
+  // sebelumnya user harus refresh manual dulu baru dapet versi terbaru.
+  let swSudahReload = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if(swSudahReload) return;
+    swSudahReload = true;
+    window.location.reload();
   });
 }
 </script>
