@@ -504,7 +504,7 @@
 <script>
 // ================== KONFIGURASI ==================
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbys_3TssKzKvycmsQqI8MHg12aqUnFUpuTl8ZACXAyUrK5mnWNsaC1bmbMd1Tt8GhTl/exec";
-const APP_VERSION = "2026-09-25-ownerpanel-v3"; // ganti tiap update, buat cek device mana yg belum update
+const APP_VERSION = "2026-09-25-upsertsafe-v4"; // ganti tiap update, buat cek device mana yg belum update
 document.getElementById("appVersionLabel").textContent = APP_VERSION;
 // ==================================================
 
@@ -803,11 +803,14 @@ $("ownerBackdateSubmitBtn").addEventListener("click", async () => {
   $("ownerBackdateSubmitStatusMsg").textContent = "Menyimpan...";
   $("ownerBackdateSubmitStatusMsg").className = "status";
   try{
-    if(ownerBackdateExistingId){
-      await sendToServer({ action: "updateSubmission", pin: ownerPin, submissionId: ownerBackdateExistingId, rider, tanggal, items, modal, qris });
-    } else {
-      await sendToServer({ action: "submitDay", requestId: generateRequestId(), rider, tanggal, items, modal, qris });
-    }
+    // SELALU pakai submitDay -- fungsi ini sudah upsert per-baris yg aman:
+    // tiap item Log dicari dulu (rider+tanggal+menu), kalau ketemu DITIMPA,
+    // kalau belum ada DITAMBAH; begitu juga baris Setoran (dicari lewat ID,
+    // ditimpa kalau ketemu, ditambah kalau belum). Jadi baik data yg sudah
+    // ada (dari "Muat Data") maupun yg benar2 baru, sama2 aman -- tidak akan
+    // menghapus item lama yg kebetulan tidak ikut disubmit ulang (beda dari
+    // updateSubmission yg hapus SEMUA baris lama dulu baru tulis ulang).
+    await sendToServer({ action: "submitDay", requestId: generateRequestId(), rider, tanggal, items, modal, qris });
     $("ownerBackdateSubmitStatusMsg").textContent = "Tersimpan ✓";
     $("ownerBackdateSubmitStatusMsg").className = "status ok";
   }catch(err){
