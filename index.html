@@ -135,6 +135,18 @@
     color:var(--ink-soft); margin-top:8px;
   }
   .menu-item-calc .val{ font-variant-numeric:tabular-nums; font-weight:600; color:var(--ink); }
+  .pg-toggle{ margin-top:8px; background:none; border:none; padding:2px 0; color:var(--ink-soft);
+    font-size:12.5px; font-weight:600; text-decoration:underline; cursor:pointer; }
+  .pg-box{ display:none; margin-top:8px; padding:10px; border:1.5px dashed var(--line); border-radius:12px; background:var(--paper-2); }
+  .pg-box.open{ display:block; }
+  .pg-row{ display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+  .pg-row + .pg-row{ margin-top:8px; }
+  .pg-row .lbl{ font-size:13px; font-weight:700; }
+  .pg-row .hint{ font-size:11.5px; color:var(--ink-soft); font-weight:400; }
+  .pg-row .stepper{ width:150px; }
+  .pg-row .stepper input{ font-size:16px; padding:6px 2px; background:#fff; }
+  .pg-row .step-btn{ width:38px; font-size:20px; }
+  .pg-badge{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:99px; font-size:11px; font-weight:700; background:#FEF3C7; color:#92400E; text-decoration:none; }
 
   .receipt{
     margin-top:18px; background:var(--paper-2); border-radius:16px 16px 4px 4px;
@@ -194,6 +206,7 @@
     width:150px; text-align:right; background:var(--blue-bg); border-color:#B9DCF2;
     padding:9px 10px; font-size:15px;
   }
+  .esbatu-note{ font-size:11.5px; line-height:1.4; color:#92400E; background:#FEF3C7; border-radius:10px; padding:7px 10px; margin:4px 0 6px; }
   .setoran-row .rp{ font-variant-numeric:tabular-nums; font-family:Consolas, monospace; color:var(--ink); }
   .setoran-result{
     margin-top:6px; padding:12px 0 10px; border-top:1px dashed var(--line);
@@ -346,6 +359,10 @@
           <span>Total Cookies</span>
           <span class="val"><span id="totalPcsCookies">0</span> pcs · <span id="totalRpCookies">Rp0</span></span>
         </div>
+        <div class="receipt-line" id="pgSummaryLine" style="display:none">
+          <span>Pecah / Gratis <span style="font-weight:400">(tidak dibayar; gratis loyalty tetap dapat komisi)</span></span>
+          <span class="val" style="white-space:nowrap"><span id="totalPecah">0</span> pecah · <span id="totalGratis">0</span> gratis</span>
+        </div>
         <div class="receipt-line total"><span>Grand Total</span><span class="val" id="totalRp">Rp0</span></div>
       </div>
 
@@ -363,6 +380,11 @@
           <span>QRIS</span>
           <input type="text" id="qrisInput" inputmode="numeric" placeholder="Rp0">
         </div>
+        <div class="setoran-row" style="border-bottom:none; padding-bottom:2px;">
+          <span>Belanja Es Batu</span>
+          <input type="text" id="esBatuInput" inputmode="numeric" placeholder="Rp0">
+        </div>
+        <p class="esbatu-note">📷 Wajib kirim <b>foto es batu yang dibeli</b> ke WhatsApp owner. Nominal ini dipotong dari Setoran Cash.</p>
         <div class="setoran-result">
           <span class="label">Setoran Cash</span>
           <span class="val" id="setoranCashVal">Rp0</span>
@@ -482,6 +504,7 @@
       <div class="report-row"><span>Jumlah Cookies</span><span class="rp" id="reportJumlahCookies">0</span></div>
       <div class="report-row"><span>Sisa Minuman (belum terjual)</span><span class="rp" id="reportSisaCup">0 cup</span></div>
       <div class="report-row"><span>Sisa Cookies (belum terjual)</span><span class="rp" id="reportSisaCookies">0 pcs</span></div>
+      <div class="report-row" id="reportPgRow" style="display:none"><span>Pecah · Gratis (loyalty)<br><small style="color:var(--ink-soft)">tidak dibayar; gratis tetap dapat komisi</small></span><span class="rp" id="reportPecahGratis" style="white-space:nowrap">0 · 0</span></div>
       <div class="report-row"><span>Total Minuman</span><span class="rp" id="reportRpMinuman">Rp0</span></div>
       <div class="report-row"><span>Total Cookies</span><span class="rp" id="reportRpCookies">Rp0</span></div>
       <div class="report-row total"><span>Grand Total</span><span class="rp" id="reportGrandTotal">Rp0</span></div>
@@ -491,6 +514,7 @@
       <h2>Setoran</h2>
       <div class="report-row"><span>Modal (Kembalian)</span><span class="rp" id="reportModal">Rp0</span></div>
       <div class="report-row"><span>QRIS</span><span class="rp" id="reportQris">Rp0</span></div>
+      <div class="report-row" id="reportEsBatuRow" style="display:none"><span>Belanja Es Batu<br><small style="color:var(--ink-soft)">kirim foto es batu via WhatsApp</small></span><span class="rp" id="reportEsBatu">Rp0</span></div>
       <div class="report-row"><span>Total Komisi + Insentif</span><span class="rp" id="reportKomisiOps">Rp0</span></div>
       <div class="report-row total grand"><span>Setoran Cash</span><span class="rp" id="reportSetoran">Rp0</span></div>
       <p id="reportAmbilKomisiNote" style="font-size:11.5px; color:var(--ink-soft); text-align:center; margin:8px 0 0;"></p>
@@ -504,7 +528,7 @@
 <script>
 // ================== KONFIGURASI ==================
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbys_3TssKzKvycmsQqI8MHg12aqUnFUpuTl8ZACXAyUrK5mnWNsaC1bmbMd1Tt8GhTl/exec";
-const APP_VERSION = "2026-09-25-upsertsafe-v4"; // ganti tiap update, buat cek device mana yg belum update
+const APP_VERSION = "2026-11-10-esbatu-v8"; // ganti tiap update, buat cek device mana yg belum update
 document.getElementById("appVersionLabel").textContent = APP_VERSION;
 // ==================================================
 
@@ -532,11 +556,12 @@ let sessionClosed = false;
 
 function applyLockState(closed){
   sessionClosed = closed;
-  document.querySelectorAll("#menuListCard .terjual, #menuListCard .step-btn").forEach(el => {
+  document.querySelectorAll("#menuListCard .terjual, #menuListCard .pecah, #menuListCard .gratis, #menuListCard .step-btn").forEach(el => {
     el.disabled = closed;
   });
   $("modalInput").disabled = closed;
   $("qrisInput").disabled = closed;
+  $("esBatuInput").disabled = closed;
   $("submitBtn").style.display = closed ? "none" : "block";
   $("editDataBtn").style.display = closed ? "block" : "none";
   $("lockedNote").style.display = closed ? "block" : "none";
@@ -831,6 +856,11 @@ $("qrisInput").addEventListener("input", () => {
 });
 attachRupiahInput($("modalInput"));
 attachRupiahInput($("qrisInput"));
+$("esBatuInput").addEventListener("input", () => {
+  updateSetoranCash();
+  if(!sessionClosed) saveDraft($("riderInput").value.trim(), $("tanggalInput").value);
+});
+attachRupiahInput($("esBatuInput"));
 attachRupiahInput($("newMenuHarga"));
 
 function formatRupiah(n){ return "Rp" + Math.round(n || 0).toLocaleString("id-ID"); }
@@ -858,12 +888,14 @@ function generateRequestId(){
 function draftKey(rider, tanggal){ return "draft_" + rider + "_" + tanggal; }
 function saveDraft(rider, tanggal){
   if(!rider || !tanggal) return;
-  const items = {};
+  const items = {}, pecah = {}, gratis = {};
   document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
     items[item.dataset.menu] = parseFloat(item.querySelector(".terjual").value) || 0;
+    pecah[item.dataset.menu] = parseFloat(item.querySelector(".pecah").value) || 0;
+    gratis[item.dataset.menu] = parseFloat(item.querySelector(".gratis").value) || 0;
   });
   const draft = {
-    items, modal: parseRupiahInput($("modalInput")), qris: parseRupiahInput($("qrisInput")),
+    items, pecah, gratis, modal: parseRupiahInput($("modalInput")), qris: parseRupiahInput($("qrisInput")), esBatu: parseRupiahInput($("esBatuInput")),
     savedAt: Date.now()
   };
   localStorage.setItem(draftKey(rider, tanggal), JSON.stringify(draft));
@@ -884,7 +916,7 @@ async function loadSession(){
   const rider = $("riderInput").value.trim();
   const tanggal = $("tanggalInput").value;
   if(!rider || !tanggal) return;
-  let serverItems = {}, serverModal = 0, serverQris = 0, serverClosed = false;
+  let serverItems = {}, serverModal = 0, serverQris = 0, serverEsBatu = 0, serverClosed = false;
   try{
     const res = await fetch(`${SCRIPT_URL}?action=getSession&rider=${encodeURIComponent(rider)}&tanggal=${encodeURIComponent(tanggal)}`);
     const data = await res.json();
@@ -892,6 +924,7 @@ async function loadSession(){
       serverItems = data.items || {};
       serverModal = data.modal || 0;
       serverQris = data.qris || 0;
+      serverEsBatu = data.esBatu || 0;
       serverClosed = !!data.closed;
     }
   }catch(e){
@@ -910,6 +943,12 @@ async function loadSession(){
     item.querySelector(".stockAwal").value = stockAwal;
     item.querySelector(".stockAwal-val").textContent = stockAwal;
     item.querySelector(".terjual").value = terjual || "";
+    const ambil = (k) => (draft && draft[k] && (menu in draft[k])) ? draft[k][menu] : (info && info[k] ? info[k] : 0);
+    const p = ambil("pecah"), g = ambil("gratis");
+    item.dataset.pgServer = (info && (info.pecah || info.gratis)) ? "1" : "";
+    item.querySelector(".pecah").value = p || "";
+    item.querySelector(".gratis").value = g || "";
+    item.querySelector(".pg-box").classList.toggle("open", !!(p || g));
     item.querySelector(".terjual").dispatchEvent(new Event("input"));
   });
 
@@ -917,6 +956,8 @@ async function loadSession(){
   const qris = draft ? (draft.qris || 0) : serverQris;
   $("modalInput").value = modal ? "Rp" + Number(modal).toLocaleString("id-ID") : "";
   $("qrisInput").value = qris ? "Rp" + Number(qris).toLocaleString("id-ID") : "";
+  const esBatu = draft && draft.esBatu !== undefined ? (draft.esBatu || 0) : serverEsBatu;
+  $("esBatuInput").value = esBatu ? "Rp" + Number(esBatu).toLocaleString("id-ID") : "";
   updateSetoranCash();
   // Ada draft lokal = sedang dalam proses input/edit yang belum dikirim -> jangan dikunci.
   // Tidak ada draft = ikuti status server (sudah ditutup atau belum).
@@ -1045,6 +1086,17 @@ function renderEntryForm(){
             <span>Sisa: <span class="val sisaVal">0</span> ${satuan}</span>
             <span>Total: <span class="val totalVal">Rp0</span></span>
           </div>
+          <button type="button" class="pg-toggle">+ Pecah / Gratis</button><span class="pg-badge" style="display:none"></span>
+          <div class="pg-box">
+            <div class="pg-row">
+              <div><div class="lbl">Pecah</div><div class="hint">Wajib dibawa pulang beserta isinya</div></div>
+              <div class="stepper"><button type="button" class="step-btn minus" data-pg="pecah">−</button><input type="number" class="pecah" inputmode="numeric" placeholder="0" min="0"><button type="button" class="step-btn plus" data-pg="pecah">+</button></div>
+            </div>
+            <div class="pg-row">
+              <div><div class="lbl">Gratis (loyalty)</div><div class="hint">Beli 7 gratis 1 — wajib bawa kartu loyalty</div></div>
+              <div class="stepper"><button type="button" class="step-btn minus" data-pg="gratis">−</button><input type="number" class="gratis" inputmode="numeric" placeholder="0" min="0"><button type="button" class="step-btn plus" data-pg="gratis">+</button></div>
+            </div>
+          </div>
         </div>`;
     });
     html += `</div></div>`;
@@ -1067,22 +1119,36 @@ function renderEntryForm(){
     const sisaVal = item.querySelector(".sisaVal");
     const totalVal = item.querySelector(".totalVal");
     const harga = parseFloat(item.dataset.harga) || 0;
+    const pecahInput = item.querySelector(".pecah"), gratisInput = item.querySelector(".gratis");
+    const pgBadge = item.querySelector(".pg-badge");
     function recalcDisplay(){
       const s = parseFloat(stockInput.value) || 0;
       const t = parseFloat(terjualInput.value) || 0;
-      sisaVal.textContent = s - t;
+      const p = parseFloat(pecahInput.value) || 0, g = parseFloat(gratisInput.value) || 0;
+      sisaVal.textContent = s - t - p - g;
+      const teksBadge = [p ? p + " pecah" : "", g ? g + " gratis" : ""].filter(Boolean).join(" · ");
+      pgBadge.textContent = teksBadge; pgBadge.style.display = teksBadge ? "" : "none";
       totalVal.textContent = formatRupiah(t * harga);
       updateGrandTotal();
       if(!sessionClosed) saveDraft(sessionRider, sessionTanggal);
     }
 
     terjualInput.addEventListener("input", recalcDisplay);
+    pecahInput.addEventListener("input", recalcDisplay);
+    gratisInput.addEventListener("input", recalcDisplay);
+    item.querySelector(".pg-toggle").addEventListener("click", () => item.querySelector(".pg-box").classList.toggle("open"));
+    item.querySelectorAll(".step-btn[data-pg]").forEach(btn => btn.addEventListener("click", () => {
+      const inp = btn.dataset.pg === "pecah" ? pecahInput : gratisInput;
+      const cur = parseFloat(inp.value) || 0;
+      inp.value = btn.classList.contains("plus") ? cur + 1 : Math.max(0, cur - 1);
+      recalcDisplay();
+    }));
 
-    item.querySelector(".step-btn.plus").addEventListener("click", () => {
+    item.querySelector(".step-btn.plus:not([data-pg])").addEventListener("click", () => {
       terjualInput.value = (parseFloat(terjualInput.value) || 0) + 1;
       recalcDisplay();
     });
-    item.querySelector(".step-btn.minus").addEventListener("click", () => {
+    item.querySelector(".step-btn.minus:not([data-pg])").addEventListener("click", () => {
       const cur = parseFloat(terjualInput.value) || 0;
       terjualInput.value = Math.max(0, cur - 1);
       recalcDisplay();
@@ -1093,29 +1159,37 @@ function renderEntryForm(){
 
 function updateGrandTotal(){
   let cupMinuman = 0, pcsCookies = 0;
-  let rpMinuman = 0, rpCookies = 0;
+  let rpMinuman = 0, rpCookies = 0, totPecah = 0, totGratis = 0, cupGratis = 0, pcsGratis = 0;
   document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
     const t = parseFloat(item.querySelector(".terjual").value) || 0;
+    const g = parseFloat((item.querySelector(".gratis") || {}).value) || 0;
+    totPecah += parseFloat((item.querySelector(".pecah") || {}).value) || 0;
+    totGratis += g;
     const harga = parseFloat(item.dataset.harga) || 0;
     const konversi = parseFloat(item.dataset.konversi) || 1;
     const rp = t * harga;
     if(item.dataset.kategori === "Minuman"){
       cupMinuman += t * konversi;
+      cupGratis += g * konversi;
       rpMinuman += rp;
     } else {
       pcsCookies += t;
+      pcsGratis += g;
       rpCookies += rp;
     }
   });
   $("totalCupMinuman").textContent = cupMinuman;
   $("totalRpMinuman").textContent = formatRupiah(rpMinuman);
   $("totalPcsCookies").textContent = pcsCookies;
+  $("totalPecah").textContent = totPecah; $("totalGratis").textContent = totGratis;
+  $("pgSummaryLine").style.display = (totPecah || totGratis) ? "" : "none";
   $("totalRpCookies").textContent = formatRupiah(rpCookies);
   rpMinumanTotal = rpMinuman;
   rpCookiesTotal = rpCookies;
   grandTotalRp = rpMinuman + rpCookies;
   $("totalRp").textContent = formatRupiah(grandTotalRp);
-  renderKomisiCard(cupMinuman, pcsCookies);
+  // Gratis loyalty ikut dihitung komisi (pecah tidak)
+  renderKomisiCard(cupMinuman + cupGratis, pcsCookies + pcsGratis);
 }
 
 function hitungKomisi(cup, aturan){
@@ -1180,7 +1254,8 @@ function updateSetoranCash(){
   const qris = parseRupiahInput($("qrisInput"));
   const ambilKomisi = currentAmbilKomisi();
   const komisiDikurangi = ambilKomisi === "Harian" ? komisiTotalRp : 0;
-  const setoran = grandTotalRp + modal - qris - currentOperasional() - komisiDikurangi;
+  const esBatu = parseRupiahInput($("esBatuInput"));
+  const setoran = grandTotalRp + modal - qris - currentOperasional() - komisiDikurangi - esBatu;
   const el = $("setoranCashVal");
   el.textContent = formatRupiah(setoran);
   el.classList.toggle("negative", setoran < 0);
@@ -1217,22 +1292,31 @@ $("submitBtn").addEventListener("click", async () => {
   document.querySelectorAll("#menuListCard .menu-item").forEach(item => {
     const s = parseFloat(item.querySelector(".stockAwal").value) || 0;
     const t = parseFloat(item.querySelector(".terjual").value) || 0;
-    if(s === 0 && t === 0) return;
+    const p = parseFloat(item.querySelector(".pecah").value) || 0;
+    const g = parseFloat(item.querySelector(".gratis").value) || 0;
+    if(s === 0 && t === 0 && p === 0 && g === 0 && !item.dataset.pgServer) return;
     items.push({
       menu: item.dataset.menu, kategori: item.dataset.kategori,
       subKategori: item.dataset.sub, satuan: item.dataset.satuan,
       konversi: parseFloat(item.dataset.konversi) || 1,
       harga: parseFloat(item.dataset.harga) || 0,
-      stockAwal: s, terjual: t
+      stockAwal: s, terjual: t, pecah: p, gratis: g
     });
   });
+  const totP = items.reduce((x, it) => x + it.pecah, 0), totG = items.reduce((x, it) => x + it.gratis, 0);
+  if((totP || totG) && !confirm("Konfirmasi sebelum kirim:\n" +
+      (totP ? "• " + totP + " pecah → cup pecah WAJIB dibawa pulang beserta isinya.\n" : "") +
+      (totG ? "• " + totG + " gratis → kartu loyalty WAJIB dibawa/diserahkan.\n" : "") +
+      "\nPecah & gratis tidak dibayar. Gratis loyalty tetap dihitung komisi, pecah tidak. Lanjut kirim?")) return;
 
   localStorage.setItem("nama_rider", rider);
   const modal = parseRupiahInput($("modalInput"));
   const qris = parseRupiahInput($("qrisInput"));
+  const esBatu = parseRupiahInput($("esBatuInput"));
+  if(esBatu > 0 && !confirm("Belanja es batu " + formatRupiah(esBatu) + " akan dipotong dari Setoran Cash.\n\nWAJIB kirim foto es batu yang dibeli ke WhatsApp owner.\n\nLanjut kirim?")) return;
   const payload = {
     action: "submitDay", requestId: generateRequestId(), rider, tanggal, items,
-    modal, qris
+    modal, qris, esBatu
   };
 
   $("submitBtn").disabled = true;
@@ -1246,14 +1330,15 @@ $("submitBtn").addEventListener("click", async () => {
     clearDraft(rider, tanggal); // sudah terkirim, draft lokal tidak diperlukan lagi
     $("modalInput").value = "";
     $("qrisInput").value = "";
+    $("esBatuInput").value = "";
     applyLockState(true);
     // Pakai angka OTORITATIF dari server (bukan hitungan client) utk laporan,
     // supaya selalu konsisten dengan yang benar-benar tersimpan di Sheet.
     const reportSnapshot = {
       rider, tanggal,
-      items: items.map(it => ({ menu: it.menu, kategori: it.kategori, satuan: it.satuan, harga: it.harga, konversi: it.konversi, stockAwal: it.stockAwal, terjual: it.terjual })),
+      items: items.map(it => ({ menu: it.menu, kategori: it.kategori, satuan: it.satuan, harga: it.harga, konversi: it.konversi, stockAwal: it.stockAwal, terjual: it.terjual, pecah: it.pecah, gratis: it.gratis })),
       rpMinuman: rpMinumanTotal, rpCookies: rpCookiesTotal, grandTotal: result.totalPenjualan,
-      modal, qris,
+      modal, qris, esBatu,
       komisiPlusOps: result.totalKomisi + result.operasional,
       setoranCash: result.setoranCash,
       jumlahCup: result.cupMinuman, jumlahCookies: result.pcsCookies,
@@ -1354,12 +1439,13 @@ function renderReport(snapshot){
   $("reportSubtitle").textContent = `${rider} · ${tanggalStr}`;
 
   $("reportMenuList").innerHTML = snapshot.items.map(item => {
-    const sisa = item.stockAwal - item.terjual;
+    const sisa = item.stockAwal - item.terjual - (item.pecah || 0) - (item.gratis || 0);
+    const pg = [item.pecah ? "Pecah " + item.pecah : "", item.gratis ? "Gratis " + item.gratis : ""].filter(Boolean).join(" · ");
     return `
       <div class="report-item">
         <div>
           <div class="name">${item.menu}</div>
-          <div class="qty">Stock Awal ${item.stockAwal} · Terjual ${item.terjual} · Sisa ${sisa} ${item.satuan}</div>
+          <div class="qty">Stock Awal ${item.stockAwal} · Terjual ${item.terjual}${pg ? " · " + pg : ""} · Sisa ${sisa} ${item.satuan}</div>
         </div>
         <div class="rp">${formatRupiah(item.terjual * item.harga)}</div>
       </div>`;
@@ -1372,12 +1458,16 @@ function renderReport(snapshot){
   // konversi, sama spt Jumlah Cup di atas), Cookies apa adanya per pcs.
   let totalSisaCup = 0, totalSisaCookies = 0;
   snapshot.items.forEach(item => {
-    const sisa = item.stockAwal - item.terjual;
+    const sisa = item.stockAwal - item.terjual - (item.pecah || 0) - (item.gratis || 0);
     if(item.kategori === "Minuman") totalSisaCup += sisa * (item.konversi || 1);
     else if(item.kategori === "Cookies") totalSisaCookies += sisa;
   });
   $("reportSisaCup").textContent = totalSisaCup + " cup";
   $("reportSisaCookies").textContent = totalSisaCookies + " pcs";
+  const totPecahR = snapshot.items.reduce((x, it) => x + (Number(it.pecah) || 0), 0);
+  const totGratisR = snapshot.items.reduce((x, it) => x + (Number(it.gratis) || 0), 0);
+  $("reportPecahGratis").textContent = totPecahR + " pecah · " + totGratisR + " gratis";
+  $("reportPgRow").style.display = (totPecahR || totGratisR) ? "" : "none";
 
   $("reportRpMinuman").textContent = formatRupiah(snapshot.rpMinuman);
   $("reportRpCookies").textContent = formatRupiah(snapshot.rpCookies);
@@ -1385,6 +1475,8 @@ function renderReport(snapshot){
 
   $("reportModal").textContent = formatRupiah(snapshot.modal);
   $("reportQris").textContent = formatRupiah(snapshot.qris);
+  $("reportEsBatu").textContent = formatRupiah(snapshot.esBatu || 0);
+  $("reportEsBatuRow").style.display = snapshot.esBatu ? "" : "none";
   $("reportKomisiOps").textContent = formatRupiah(snapshot.komisiPlusOps);
   $("reportSetoran").textContent = formatRupiah(snapshot.setoranCash);
   const noteEl = $("reportAmbilKomisiNote");
