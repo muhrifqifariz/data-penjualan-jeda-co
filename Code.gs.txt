@@ -6317,7 +6317,7 @@ function rptBangunModel(ss, tahun, detail) {
   const fakta = (b, k, u) => {
     const key = b + "|" + k + "|" + (u || "");
     if (!F[key]) F[key] = {
-      b, k, u: u || "", pk: 0, diskon: 0, komplimen: 0, hppIsi: 0, hppPack: 0, hppPecah: 0, pecahQty: 0, pecahCup: 0, gratisQty: 0, gratisCup: 0, cup: 0, cookies: 0,
+      b, k, u: u || "", pk: 0, diskon: 0, komplimen: 0, hppIsi: 0, hppPack: 0, hppPecah: 0, pecahQty: 0, pecahCup: 0, gratisQty: 0, gratisCup: 0, gratisOwnerQty: 0, gratisOwnerNilai: 0, cup: 0, cookies: 0,
       hari: {}, opex: {}, penyusutan: 0, bagiHasil: 0, menu: {}, hppKurang: 0, lain: 0
     };
     return F[key];
@@ -6480,9 +6480,12 @@ function rptBangunModel(ss, tahun, detail) {
       if (det && det.bulan === b && ((nonJual === "pecah" && (det.baris === "HPP Pecah/Rusak" || det.baris === "HPP")))) detailRows.push(rowN);
       return;
     }
-    f.pk += total;
-    if (total > 0 && /^\d{4}-\d{2}-\d{2}$/.test(tgl) && (!tglJualPertama || tgl < tglJualPertama)) tglJualPertama = tgl;
-    if (komplimen) f.komplimen += total - 0; else f.diskon += diskon;
+    // Produk gratis dari Jeda Owner diperlakukan SAMA dgn gratis loyalty rider:
+    // tidak masuk Penjualan Kotor & cup terjual; hanya HPP-nya yg jadi biaya
+    // (OPEX Marketing) + jumlahnya ditampilkan sbg info.
+    if (komplimen) { f.gratisOwnerQty += qty; f.gratisOwnerNilai += total; }
+    else { f.pk += total; f.diskon += diskon; }
+    if (total > 0 && !komplimen && /^\d{4}-\d{2}-\d{2}$/.test(tgl) && (!tglJualPertama || tgl < tglJualPertama)) tglJualPertama = tgl;
     const nilaiBersih = komplimen ? 0 : total - diskon;
     if (total !== 0 || qty !== 0) { f.hari[tgl] = true; B[b].hariJualan[tgl] = true; }
     // cup setara
@@ -6492,7 +6495,7 @@ function rptBangunModel(ss, tahun, detail) {
       else if (!isOwner) cup = Number(r[13]) || 0;
       else cup = qty * (pengaliBerlaku(base.tabelKonversi, menuOwnerSub[menu] || "Cup", tgl) || 1);
     }
-    f.cup += cup; f.cookies += cookies;
+    if (!komplimen) { f.cup += cup; f.cookies += cookies; }
     // HPP
     let hpp = null;
     if (!ongkir && qty > 0) {
@@ -6542,7 +6545,7 @@ function rptBangunModel(ss, tahun, detail) {
     // detail penjualan
     if (det && det.bulan === b) {
       const rowDet = { tanggal: tgl, sumber: isOwner ? "Penjualan Owner" : "Log Rider", item: menu, ket: penjual + (ket ? " · " + ket : ""), qty, harga, total, karyawan: k };
-      if (det.baris === "Penjualan Kotor") detailRows.push(rowDet);
+      if (det.baris === "Penjualan Kotor" && !komplimen) detailRows.push(rowDet);
       if (det.baris === "Diskon & Promo" && !komplimen && diskon) detailRows.push(Object.assign({}, rowDet, { total: diskon }));
       if (det.baris === "Komplimen/KOL" && komplimen) detailRows.push(rowDet);
       if (det.baris === "Penjualan Bersih" && !komplimen) detailRows.push(Object.assign({}, rowDet, { total: nilaiBersih }));
@@ -6976,7 +6979,7 @@ function handleGetReport(ss, params) {
     const menu = {}; Object.keys(f.menu).forEach(k => { const x = f.menu[k]; if (x.qty || x.omzet) menu[k] = [r2(x.qty), r2(x.omzet), r2(x.hpp), x.kategori === "Cookies" ? 1 : 0]; });
     const h = m.hadir[f.b + "|" + f.k] || { hadir: 0, absen: 0, libur: 0 };
     return {
-      b: f.b, k: f.k, u: f.u, pk: r2(f.pk), diskon: r2(f.diskon), komplimen: r2(f.komplimen),
+      b: f.b, k: f.k, u: f.u, pk: r2(f.pk), diskon: r2(f.diskon), komplimen: r2(f.komplimen), gratisOwnerQty: r2(f.gratisOwnerQty), gratisOwnerNilai: r2(f.gratisOwnerNilai),
       hppIsi: r2(f.hppIsi), hppPack: r2(f.hppPack), hppPecah: r2(f.hppPecah), pecahQty: r2(f.pecahQty), pecahCup: r2(f.pecahCup), gratisQty: r2(f.gratisQty), gratisCup: r2(f.gratisCup), cup: r2(f.cup), cookies: r2(f.cookies),
       hariAktif: Object.keys(f.hari).length, hadir: h.hadir, absen: h.absen, libur: h.libur,
       opex, penyusutan: r2(f.penyusutan), bagiHasil: r2(f.bagiHasil), menu, hppKurang: r2(f.hppKurang)
@@ -7031,7 +7034,7 @@ function handleGetReport(ss, params) {
     satuanTakCocok: Object.keys(m.satuanTakCocok),
     asumsi: [
       "Basis = bulan kalender sesuai tanggal transaksi. Gaji diakui sesuai tanggal entri di Procurement.",
-      "Penjualan = sheet Log Gabungan Penjualan (Total; Penjualan Owner dikurangi Diskon). Produk Gratis = Penjualan Owner berstatus Gratis atau diskon 100%: nilai jualnya hanya mengurangi Penjualan Kotor (bukan biaya), HPP-nya masuk OPEX Marketing. Uang yg dibayar ke KOL dicatat di Procurement kategori Marketing.",
+      "Penjualan = sheet Log Gabungan Penjualan (Total; Penjualan Owner dikurangi Diskon). Produk gratis dari Jeda Owner (status Gratis / diskon 100%) TIDAK masuk Penjualan Kotor & cup terjual (sama seperti gratis loyalty rider): hanya HPP-nya yg jadi biaya di OPEX Marketing. Uang yg dibayar ke KOL dicatat di Procurement kategori Marketing.",
       "Produk Dibuang (Jeda Admin) & Gratis Loyalty (Jeda Rider): HPP-nya jadi biaya (OPEX Produk Dibuang / Promo Gratis) dan bahannya mengurangi persediaan.",
       "HPP = Σ qty terjual × HPP per unit menu (resep yg berlaku di tanggal transaksi, harga rata-rata pembelian bulan itu, carry-forward). Pembelian bahan/packaging dicatat sbg Persediaan, bukan biaya langsung.",
       "Biaya listrik & komponen lain yg sudah masuk HPP lewat Bahan Turunan dikurangkan dari baris OPEX-nya (tidak dihitung dua kali).",
