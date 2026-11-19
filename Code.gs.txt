@@ -1985,15 +1985,16 @@ function setupPenjualanOwnerSheet(ss) {
         .setFontWeight("bold").setBackground("#7A1E2B").setFontColor("#FFFFFF");
       sheet.autoResizeColumns(1, 13);
     }
+    pastikanKolomStatusProduk(sheet);
     return sheet;
   }
   sheet = ss.insertSheet(SHEET_PENJUALAN_OWNER);
-  sheet.getRange(1, 1, 1, 13).setValues([[
+  sheet.getRange(1, 1, 1, 14).setValues([[
     "Waktu", "Tanggal", "Nama Penjual", "Nama Customer", "Menu", "Kategori",
-    "Harga", "Qty", "Total", "Status Bayar", "ID Transaksi", "Diskon", "Keterangan"
+    "Harga", "Qty", "Total", "Status Bayar", "ID Transaksi", "Diskon", "Keterangan", "Status Produk"
   ]]).setFontWeight("bold").setBackground("#7A1E2B").setFontColor("#FFFFFF");
   sheet.setFrozenRows(1);
-  sheet.autoResizeColumns(1, 13);
+  sheet.autoResizeColumns(1, 14);
   return sheet;
 }
 
@@ -2264,11 +2265,12 @@ function rebuildLogGabungan(ss) {
     // Dari sheet "Penjualan Owner" (Jeda Owner) -- HANYA DIBACA, tidak diubah
     const lastOwnerRow = findLastDataRow(ownerSheet, 1);
     if (lastOwnerRow > 1) {
-      ownerSheet.getRange(2, 1, lastOwnerRow - 1, 13).getValues().forEach(r => {
+      ownerSheet.getRange(2, 1, lastOwnerRow - 1, lebarOwner(ownerSheet)).getValues().forEach(r => {
         if (!r[4]) return;
+        // Kolom Status Bayar di sheet gabungan = status PEMBAYARAN saja (PO lama -> Belum Dibayar)
         rows.push([
           "Owner", r[0], r[1], r[2], r[3], r[4], r[5], "", "",
-          r[6], r[7], "", "", "", r[11], r[8], r[9], r[12], r[10]
+          r[6], r[7], "", "", "", r[11], r[8], statusOwnerDariRow(r).bayar, r[12], r[10]
         ]);
       });
     }
@@ -3835,6 +3837,28 @@ function handleGetRingkasanUangMasuk(ss) {
 // tampil di baris "Produk Gratis" (pengurang penjualan kotor), HPP-nya masuk
 // OPEX Marketing.
 const STATUS_GRATIS = "Gratis";
+// ---- Status transaksi Jeda Owner = 2 dimensi ----
+//  Kolom J "Status Bayar"  : Sudah Dibayar / Belum Dibayar / Gratis
+//  Kolom N "Status Produk" : PO / Belum Diterima / Sudah Diterima
+// Data lama: J = "PO" (= PO, belum bayar); kolom N kosong = Sudah Diterima.
+const STATUS_PRODUK = ["PO", "Belum Diterima", "Sudah Diterima"];
+const STATUS_BAYAR_OWNER = ["Sudah Dibayar", "Belum Dibayar", STATUS_GRATIS];
+function normStatusOwner(bayar, produk) {
+  bayar = String(bayar || "").trim(); produk = String(produk || "").trim();
+  if (bayar === "PO") { bayar = "Belum Dibayar"; if (STATUS_PRODUK.indexOf(produk) < 0) produk = "PO"; }
+  if (STATUS_BAYAR_OWNER.indexOf(bayar) < 0) bayar = "Belum Dibayar";
+  if (STATUS_PRODUK.indexOf(produk) < 0) produk = "Sudah Diterima";
+  return { bayar, produk };
+}
+// row = baris sheet Penjualan Owner (minimal 9 kolom; kolom N opsional)
+function statusOwnerDariRow(row) { return normStatusOwner(row[9], row.length > 13 ? row[13] : ""); }
+function pastikanKolomStatusProduk(sheet) {
+  if (sheet.getMaxColumns() < 14) sheet.insertColumnsAfter(sheet.getMaxColumns(), 14 - sheet.getMaxColumns());
+  if (String(sheet.getRange(1, 14).getValue()) !== "Status Produk") {
+    sheet.getRange(1, 14).setValue("Status Produk").setFontWeight("bold").setBackground("#7A1E2B").setFontColor("#FFFFFF");
+  }
+}
+function lebarOwner(sheet) { return Math.min(14, sheet.getMaxColumns()); }
 function ketGratisBersih(ket) { return String(ket || "").replace(/^GRATIS \([^)]*\)( · )?/, ""); }
 function alasanGratisDari(ket) { const m = /^GRATIS \(([^)]*)\)/.exec(String(ket || "")); return m ? m[1] : ""; }
 function ketGratis(alasan, ket) {
@@ -3846,14 +3870,14 @@ function handleListTransaksiOwner(ss) {
   const lastRow = findLastDataRow(sheet, 1);
   const byTransaksi = {};
   if (lastRow > 1) {
-    const rows = sheet.getRange(2, 1, lastRow - 1, 13).getValues();
+    const rows = sheet.getRange(2, 1, lastRow - 1, lebarOwner(sheet)).getValues();
     rows.forEach(row => {
-      const status = row[9];
+      const st = statusOwnerDariRow(row);
       const idTransaksi = row[10];
       if (!idTransaksi) return;
       if (!byTransaksi[idTransaksi]) {
         byTransaksi[idTransaksi] = {
-          idTransaksi, status,
+          idTransaksi, status: st.bayar, statusProduk: st.produk,
           waktu: row[0],
           tanggal: row[1] instanceof Date
             ? Utilities.formatDate(row[1], Session.getScriptTimeZone(), "yyyy-MM-dd") : row[1],
@@ -3938,7 +3962,8 @@ function doPost(e) {
         const sheet = ss.getSheetByName(SHEET_PENJUALAN_OWNER);
         const now = new Date();
         const transaksiId = Utilities.getUuid();
-        const gratis = data.statusBayar === STATUS_GRATIS;
+        const st = normStatusOwner(data.statusBayar, data.statusProduk);
+        const gratis = st.bayar === STATUS_GRATIS;
         const diskonTambahan = gratis ? 0 : (data.discount || 0);
         const keterangan = gratis ? ketGratis(data.alasanGratis, data.keterangan) : ketGratisBersih(data.keterangan);
         const itemsWithDiskon = distribusiDiskonProporsional(data.items, diskonTambahan);
@@ -3946,18 +3971,19 @@ function doPost(e) {
         const rows = itemsWithDiskon.map(item => [
           now, data.tanggal, data.penjual, data.customer || "",
           item.menu, item.kategori, item.harga, item.qty, item.qty * item.harga,
-          data.statusBayar || "Belum Dibayar", transaksiId, item.diskonFinal, keterangan
+          st.bayar, transaksiId, item.diskonFinal, keterangan, st.produk
         ]);
         const ongkir = gratis ? 0 : (data.ongkir || 0);
         if (ongkir > 0) {
           rows.push([
             now, data.tanggal, data.penjual, data.customer || "",
             ONGKIR_MENU_LABEL, "Lainnya", ongkir, 1, ongkir,
-            data.statusBayar || "Belum Dibayar", transaksiId, 0, keterangan
+            st.bayar, transaksiId, 0, keterangan, st.produk
           ]);
         }
+        pastikanKolomStatusProduk(sheet);
         const appendRow = findLastDataRow(sheet, 1) + 1;
-        sheet.getRange(appendRow, 1, rows.length, 13).setValues(rows);
+        sheet.getRange(appendRow, 1, rows.length, 14).setValues(rows);
         const subtotal = rows.reduce((sum, r) => sum + r[8], 0);
         const totalDiskon = rows.reduce((sum, r) => sum + (r[11] || 0), 0);
         const grandTotal = Math.max(0, subtotal - totalDiskon);
@@ -3993,7 +4019,8 @@ function doPost(e) {
         }
         // Tulis ulang baris baru (hasil revisi) dg ID Transaksi yg SAMA
         const now = new Date();
-        const gratis = data.statusBayar === STATUS_GRATIS;
+        const st = normStatusOwner(data.statusBayar, data.statusProduk);
+        const gratis = st.bayar === STATUS_GRATIS;
         const diskonTambahan = gratis ? 0 : (data.discount || 0);
         const keterangan = gratis ? ketGratis(data.alasanGratis, data.keterangan) : ketGratisBersih(data.keterangan);
         const itemsWithDiskon = distribusiDiskonProporsional(data.items, diskonTambahan);
@@ -4001,18 +4028,19 @@ function doPost(e) {
         const rows = itemsWithDiskon.map(item => [
           now, data.tanggal, data.penjual, data.customer || "",
           item.menu, item.kategori, item.harga, item.qty, item.qty * item.harga,
-          data.statusBayar || "Belum Dibayar", transaksiId, item.diskonFinal, keterangan
+          st.bayar, transaksiId, item.diskonFinal, keterangan, st.produk
         ]);
         const ongkir = gratis ? 0 : (data.ongkir || 0);
         if (ongkir > 0) {
           rows.push([
             now, data.tanggal, data.penjual, data.customer || "",
             ONGKIR_MENU_LABEL, "Lainnya", ongkir, 1, ongkir,
-            data.statusBayar || "Belum Dibayar", transaksiId, 0, keterangan
+            st.bayar, transaksiId, 0, keterangan, st.produk
           ]);
         }
+        pastikanKolomStatusProduk(sheet);
         const appendRow = findLastDataRow(sheet, 1) + 1;
-        sheet.getRange(appendRow, 1, rows.length, 13).setValues(rows);
+        sheet.getRange(appendRow, 1, rows.length, 14).setValues(rows);
         const subtotal = rows.reduce((sum, r) => sum + r[8], 0);
         const totalDiskon = rows.reduce((sum, r) => sum + (r[11] || 0), 0);
         const grandTotal = Math.max(0, subtotal - totalDiskon);
@@ -4032,14 +4060,15 @@ function doPost(e) {
       let totalDiskon = 0;
       let ongkir = 0;
       if (lastRow > 1) {
-        const rows = sheet.getRange(2, 1, lastRow - 1, 13).getValues();
+        const rows = sheet.getRange(2, 1, lastRow - 1, lebarOwner(sheet)).getValues();
         rows.forEach(row => {
           if (row[10] !== data.transaksiId) return;
           if (!info) {
+            const st = statusOwnerDariRow(row);
             info = {
               tanggal: row[1] instanceof Date
                 ? Utilities.formatDate(row[1], Session.getScriptTimeZone(), "yyyy-MM-dd") : row[1],
-              penjual: row[2], customer: row[3], statusBayar: row[9],
+              penjual: row[2], customer: row[3], statusBayar: st.bayar, statusProduk: st.produk,
               keterangan: row[12] || ""
             };
           }
@@ -4062,20 +4091,28 @@ function doPost(e) {
       const lock = LockService.getScriptLock();
       lock.waitLock(10000);
       try {
+        // Bisa ubah Status Bayar dan/atau Status Produk. Hanya sel J & N baris
+        // transaksi itu yg ditulis (upsert per baris), data lain tidak disentuh.
         const sheet = ss.getSheetByName(SHEET_PENJUALAN_OWNER);
         const lastRow = findLastDataRow(sheet, 1);
         if (lastRow > 1) {
-          const idSt = sheet.getRange(2, 10, lastRow - 1, 2).getValues(); // [status, id]
-          // Gratis menyangkut diskon 100% -> tidak bisa diubah hanya lewat tombol status
-          const adaGratis = idSt.some(x => x[1] === data.transaksiId && x[0] === STATUS_GRATIS);
-          if ((adaGratis || data.statusBayar === STATUS_GRATIS) && !(adaGratis && data.statusBayar === STATUS_GRATIS)) {
+          const v = sheet.getRange(2, 1, lastRow - 1, lebarOwner(sheet)).getValues();
+          const idx = [];
+          v.forEach((r, i) => { if (r[10] === data.transaksiId) idx.push(i); });
+          if (!idx.length) return jsonError("Transaksi tidak ditemukan.");
+          const lama = statusOwnerDariRow(v[idx[0]]);
+          const minta = data.statusBayar !== undefined && data.statusBayar !== "" ? normStatusOwner(data.statusBayar, data.statusProduk) : null;
+          const bayarBaru = minta ? minta.bayar : lama.bayar;
+          let produkBaru = lama.produk;
+          if (data.statusProduk && STATUS_PRODUK.indexOf(data.statusProduk) >= 0) produkBaru = data.statusProduk;
+          else if (minta && String(data.statusBayar).trim() === "PO") produkBaru = "PO"; // app lama
+          // Gratis menyangkut diskon 100% -> status bayarnya hanya bisa diubah lewat Edit
+          if ((lama.bayar === STATUS_GRATIS) !== (bayarBaru === STATUS_GRATIS)) {
             return jsonError("Transaksi gratis hanya bisa diubah lewat tombol Edit (supaya diskonnya ikut dihitung ulang).");
           }
-          for (let i = 0; i < idSt.length; i++) {
-            if (idSt[i][1] === data.transaksiId) {
-              sheet.getRange(i + 2, 10).setValue(data.statusBayar);
-            }
-          }
+          pastikanKolomStatusProduk(sheet);
+          idx.forEach(i => sheet.getRange(i + 2, 10).setValue(bayarBaru));
+          idx.forEach(i => sheet.getRange(i + 2, 14).setValue(produkBaru));
         }
         rebuildLogGabungan(ss);
         invalidateRingkasanCache();
